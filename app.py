@@ -165,6 +165,8 @@ def joystick():
 @app.route('/arm', methods=['POST'])
 def arm():
     global armed
+    joystick_state["throttle"] = -1.0
+
     
     # Safety check: throttle must be at minimum
     if joystick_state["throttle"] > -0.9:
@@ -180,7 +182,6 @@ def arm():
         
     armed = True
     telemetry["armed"] = True
-    joystick_state["throttle"] = -1.0
     
     return jsonify({
         "status": "ok",
