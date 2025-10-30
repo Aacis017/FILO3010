@@ -195,6 +195,7 @@ def disarm():
     if arduino:
         arduino.write(b"DISARM\n")
     
+    joystick_state["throttle"] = -1.0
     return jsonify({
         "status": "ok",
         "message": "🔴 Motors DISARMED"
