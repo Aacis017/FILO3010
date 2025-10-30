@@ -67,6 +67,10 @@ telemetry = {
     "connection": "disconnected"
 }
 
+# Shared variable for arm response
+arm_response = None
+arm_response_lock = threading.Lock()
+
 # -------------------------
 # Frame generator
 # -------------------------
@@ -164,7 +168,7 @@ def joystick():
 
 @app.route('/arm', methods=['POST'])
 def arm():
-    global armed
+    global armed, arm_response
     
     # Safety check: throttle must be at minimum
     if joystick_state["throttle"] > -0.9:
@@ -175,44 +179,34 @@ def arm():
     
     # Request Arduino to arm and wait for response
     if arduino:
-        arduino.reset_input_buffer()  # Clear any old data
+        with arm_response_lock:
+            arm_response = None  # Reset response
+        
         arduino.write(b"ARM\n")
         
-        # Wait for Arduino response (up to 2 seconds)
+        # Wait for Arduino response (up to 3 seconds)
         start_time = time.time()
-        arm_response = None
         
-        while (time.time() - start_time) < 2.0:
-            if arduino.in_waiting:
-                try:
-                    line = arduino.readline().decode("utf-8", errors="ignore").strip()
-                    if "Motors ARMED" in line:
-                        armed = True
-                        telemetry["armed"] = True
-                        arm_response = "success"
-                        break
-                    elif "Pre-arm checks FAILED" in line or "❌" in line:
-                        arm_response = "failed"
-                        break
-                except:
-                    pass
+        while (time.time() - start_time) < 3.0:
+            with arm_response_lock:
+                if arm_response == "success":
+                    armed = True
+                    telemetry["armed"] = True
+                    return jsonify({
+                        "status": "ok",
+                        "message": "🟢 Motors ARMED - BE CAREFUL!"
+                    })
+                elif arm_response == "failed":
+                    return jsonify({
+                        "status": "error",
+                        "message": "❌ Pre-arm checks FAILED! Check: Battery, Level surface, IMU, Throttle"
+                    }), 400
             time.sleep(0.05)
         
-        if arm_response == "success":
-            return jsonify({
-                "status": "ok",
-                "message": "🟢 Motors ARMED - BE CAREFUL!"
-            })
-        elif arm_response == "failed":
-            return jsonify({
-                "status": "error",
-                "message": "❌ Pre-arm checks FAILED! Check: Battery, Level surface, IMU"
-            }), 400
-        else:
-            return jsonify({
-                "status": "error",
-                "message": "⚠️ No response from flight controller"
-            }), 500
+        return jsonify({
+            "status": "error",
+            "message": "⚠️ No response from flight controller. Check Arduino connection."
+        }), 500
     else:
         return jsonify({
             "status": "error",
@@ -228,7 +222,6 @@ def disarm():
     if arduino:
         arduino.write(b"DISARM\n")
     
-    joystick_state["throttle"] = -1.0
     return jsonify({
         "status": "ok",
         "message": "🔴 Motors DISARMED"
@@ -252,7 +245,7 @@ def get_status():
 # Background thread to read serial data
 # -------------------------
 def read_from_arduino():
-    global telemetry, armed
+    global telemetry, armed, arm_response
     if not arduino:
         return
     
@@ -277,20 +270,31 @@ def read_from_arduino():
                     elif line.startswith("ACK,"):
                         print(f"✅ {line}")
                         telemetry["connection"] = "connected"
-                        
+                    
+                    # Handle ARM responses
+                    elif "Motors ARMED" in line:
+                        print(f"✅ ARM SUCCESS: {line}")
+                        with arm_response_lock:
+                            arm_response = "success"
+                    
+                    elif "Pre-arm checks FAILED" in line or ("❌" in line and "arm" in line.lower()):
+                        print(f"❌ ARM FAILED: {line}")
+                        with arm_response_lock:
+                            arm_response = "failed"
+                    
                     elif line.startswith("🚨"):
                         print(f"⚠️ ALERT: {line}")
                         armed = False
                         telemetry["armed"] = False
                         
-                    elif line.startswith("STATUS,"):
+                    elif line.startsWith("STATUS,"):
                         parts = line.split(',')
                         if len(parts) >= 4:
                             telemetry["armed"] = parts[1] == "ARMED"
                             telemetry["battery_voltage"] = float(parts[2])
                             telemetry["roll"] = float(parts[3])
                             telemetry["pitch"] = float(parts[4])
-                            
+                    
                     else:
                         print(f"📡 {line}")
                         

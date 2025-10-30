@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mode: 'static',
         position: { left: '50%', top: '50%' },
         color: '#00ff88',
-        size: 160
+        size: 140
     });
 
     const joystickRight = nipplejs.create({
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mode: 'static',
         position: { left: '50%', top: '50%' },
         color: '#00ff88',
-        size: 160
+        size: 140
     });
 
     // LEFT joystick → throttle (Y) + yaw (X)
@@ -250,17 +250,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Battery
         const batteryLevel = document.getElementById('battery-level');
+        const topBatteryLevel = document.getElementById('top-battery-level');
         const batteryFill = document.getElementById('battery-fill');
         const batteryPercent = telem.battery_percent || 0;
+        
         batteryLevel.textContent = `${batteryPercent}%`;
+        topBatteryLevel.textContent = `${batteryPercent}%`;
         batteryFill.style.width = `${batteryPercent}%`;
         
         if (batteryPercent < 20) {
             batteryFill.className = 'battery-fill low';
+            topBatteryLevel.style.color = '#ff4444';
         } else if (batteryPercent < 40) {
             batteryFill.className = 'battery-fill medium';
+            topBatteryLevel.style.color = '#ffaa00';
         } else {
             batteryFill.className = 'battery-fill';
+            topBatteryLevel.style.color = '#00ff88';
         }
         
         // Voltage
