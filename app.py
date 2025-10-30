@@ -287,9 +287,9 @@ def read_from_arduino():
                         armed = False
                         telemetry["armed"] = False
                         
-                    elif line.startsWith("STATUS,"):
+                    elif line.startswith("STATUS,"):
                         parts = line.split(',')
-                        if len(parts) >= 4:
+                        if len(parts) >= 5:
                             telemetry["armed"] = parts[1] == "ARMED"
                             telemetry["battery_voltage"] = float(parts[2])
                             telemetry["roll"] = float(parts[3])
