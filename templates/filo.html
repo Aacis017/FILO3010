@@ -362,6 +362,14 @@
                 height: 110px;
             }
 
+            .joystick-container:first-child {
+                margin-left: 20px;
+            }
+
+            .joystick-container:last-child {
+                margin-right: 20px;
+            }
+
             .angle-value {
                 font-size: 18px;
             }
@@ -422,6 +430,14 @@
             .joystick-zone {
                 width: 95px;
                 height: 95px;
+            }
+
+            .joystick-container:first-child {
+                margin-left: 25px;
+            }
+
+            .joystick-container:last-child {
+                margin-right: 25px;
             }
 
             .bottom-controls {
@@ -547,8 +563,8 @@
 
     <!-- Bottom controls -->
     <div class="bottom-controls">
-        <!-- Left joystick: Throttle + Yaw -->
-        <div class="joystick-container">
+        <!-- Left joystick: Throttle + Yaw (moved slightly right) -->
+        <div class="joystick-container" style="margin-left: 20px;">
             <div id="joystick-left" class="joystick-zone"></div>
             <div class="joystick-label">Throttle • Yaw</div>
         </div>
@@ -564,8 +580,8 @@
             </button>
         </div>
 
-        <!-- Right joystick: Pitch + Roll -->
-        <div class="joystick-container">
+        <!-- Right joystick: Pitch + Roll (moved slightly left) -->
+        <div class="joystick-container" style="margin-right: 20px;">
             <div id="joystick-right" class="joystick-zone"></div>
             <div class="joystick-label">Pitch • Roll</div>
         </div>
