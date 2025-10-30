@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // nipplejs gives: vector.y = -1 when UP, +1 when DOWN
         // We want: throttle = +1 when UP, -1 when DOWN
         // So we need to invert: throttle = -vector.y
-        joystickState.throttle = -data.vector.y;
+        joystickState.throttle = data.vector.y;
         
         // Yaw: -1 (left) to +1 (right)
         joystickState.yaw = applyExpo(data.vector.x);
