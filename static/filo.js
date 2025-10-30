@@ -55,14 +55,18 @@ document.addEventListener('DOMContentLoaded', () => {
     joystickLeft.on('move', (evt, data) => {
         leftJoystickActive = true;
         
-        // Throttle: -1 (down/minimum) to +1 (up/maximum)
-        // data.vector.y: -1 (up) to +1 (down), so we negate it
+        // Throttle mapping: joystick UP = maximum throttle (+1), DOWN = minimum (-1)
+        // nipplejs gives: vector.y = -1 when UP, +1 when DOWN
+        // We want: throttle = +1 when UP, -1 when DOWN
+        // So we need to invert: throttle = -vector.y
         joystickState.throttle = -data.vector.y;
         
         // Yaw: -1 (left) to +1 (right)
         joystickState.yaw = applyExpo(data.vector.x);
         
-        console.log('Left Joystick - Throttle:', joystickState.throttle.toFixed(2), 'Yaw:', joystickState.yaw.toFixed(2));
+        // Calculate actual PWM for display
+        const throttlePWM = 1000 + ((joystickState.throttle + 1) * 500);
+        console.log('Left Joystick - Throttle:', joystickState.throttle.toFixed(2), '→', Math.round(throttlePWM) + 'μs', 'Yaw:', joystickState.yaw.toFixed(2));
     });
 
     joystickLeft.on('end', () => {

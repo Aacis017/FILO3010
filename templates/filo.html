@@ -21,6 +21,8 @@
             color: #fff;
             overflow: hidden;
             height: 100vh;
+            font-style: italic;
+            font-weight: 600;
         }
 
         /* Full screen video background */
@@ -77,22 +79,24 @@
 
         .telemetry-row {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             background: rgba(0,0,0,0.6);
-            padding: 8px 15px;
+            padding: 6px 12px;
             border-radius: 20px;
             backdrop-filter: blur(10px);
-            font-size: 14px;
+            font-size: 13px;
+            align-items: center;
         }
 
         .telem-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         }
 
         .telem-item i {
             color: #00ff88;
+            font-size: 14px;
         }
 
         #connection-status {
@@ -216,23 +220,23 @@
             left: 0;
             right: 0;
             z-index: 10;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
         }
 
         .joystick-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .joystick-zone {
-            width: 160px;
-            height: 160px;
+            width: 140px;
+            height: 140px;
             background: rgba(255, 255, 255, 0.1);
             border: 2px solid rgba(0, 255, 136, 0.4);
             border-radius: 50%;
@@ -241,10 +245,11 @@
         }
 
         .joystick-label {
-            font-size: 12px;
+            font-size: 11px;
             color: #00ff88;
             text-transform: uppercase;
             letter-spacing: 1px;
+            white-space: nowrap;
         }
 
         /* Center control buttons */
@@ -353,35 +358,128 @@
 
         @media (max-width: 768px) {
             .joystick-zone {
-                width: 130px;
-                height: 130px;
+                width: 110px;
+                height: 110px;
             }
 
             .angle-value {
-                font-size: 20px;
+                font-size: 18px;
             }
 
             .throttle-value {
-                font-size: 24px;
+                font-size: 22px;
             }
 
             .attitude-indicator {
-                gap: 25px;
+                gap: 20px;
             }
-        }
 
-        @media (orientation: landscape) and (max-height: 500px) {
-            .joystick-zone {
-                width: 110px;
-                height: 110px;
+            .angle-display {
+                padding: 8px 12px;
             }
 
             .bottom-controls {
                 padding: 10px;
             }
 
+            .center-controls {
+                gap: 8px;
+            }
+
+            .arm-btn, .disarm-btn {
+                padding: 12px 20px;
+                font-size: 13px;
+                min-width: 110px;
+            }
+
+            .telemetry-row {
+                font-size: 11px;
+                padding: 5px 10px;
+                gap: 8px;
+            }
+
+            .telem-item i {
+                font-size: 12px;
+            }
+
+            .back-button {
+                font-size: 14px;
+                padding: 6px 12px;
+            }
+
+            .joystick-label {
+                font-size: 10px;
+            }
+
+            .safety-notice {
+                bottom: 160px;
+                font-size: 10px;
+                padding: 5px 10px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .joystick-zone {
+                width: 95px;
+                height: 95px;
+            }
+
+            .bottom-controls {
+                padding: 8px;
+            }
+
+            .angle-display {
+                padding: 6px 10px;
+            }
+
+            .angle-value {
+                font-size: 16px;
+            }
+
+            .throttle-value {
+                font-size: 20px;
+            }
+
+            .arm-btn, .disarm-btn {
+                padding: 10px 16px;
+                font-size: 12px;
+                min-width: 90px;
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) {
+            .joystick-zone {
+                width: 90px;
+                height: 90px;
+            }
+
+            .bottom-controls {
+                padding: 8px;
+            }
+
             .center-hud {
-                gap: 20px;
+                gap: 15px;
+            }
+
+            .angle-display {
+                padding: 6px 10px;
+            }
+
+            .angle-value {
+                font-size: 16px;
+            }
+
+            .throttle-value {
+                font-size: 18px;
+            }
+
+            .arm-btn, .disarm-btn {
+                padding: 8px 15px;
+                font-size: 11px;
+            }
+
+            .safety-notice {
+                bottom: 120px;
             }
         }
     </style>
@@ -400,6 +498,10 @@
 
         <div class="top-telemetry">
             <div class="telemetry-row">
+                <div class="telem-item">
+                    <i class="fas fa-battery-three-quarters"></i>
+                    <span id="top-battery-level">--%</span>
+                </div>
                 <div class="telem-item">
                     <i class="fas fa-wifi"></i>
                     <div id="connection-status"></div>
@@ -477,7 +579,7 @@
     </div>
 
     <div class="safety-notice">
-        ⚠️ DOUBLE TAP FOR EMERGENCY STOP
+        🚨 TRIPLE TAP SCREEN FOR EMERGENCY STOP
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
