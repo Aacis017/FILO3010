@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🚁 Drone Control</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .top-bar {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .back-button {
+            color: #00ff88;
+            text-decoration: none;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .connection-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #connection-status {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #666;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .video-container {
+            width: 100%;
+            height: 35vh;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            position: relative;
+        }
+
+        .video-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .control-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            height: calc(65vh - 60px);
+            position: relative;
+        }
+
+        .joystick-zone {
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(0, 255, 136, 0.5);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .telemetry {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            min-width: 200px;
+        }
+
+        .telemetry-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .telemetry-item i {
+            color: #00ff88;
+            font-size: 18px;
+            width: 24px;
+        }
+
+        .telemetry-item span {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .arm-btn, .disarm-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .arm-btn {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .arm-btn:hover:not(:disabled) {
+            background: #00cc66;
+            transform: scale(1.05);
+        }
+
+        .arm-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .disarm-btn {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .disarm-btn:hover:not(:disabled) {
+            background: #cc0000;
+            transform: scale(1.05);
+        }
+
+        .disarm-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        #armed-status {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff0000;
+            text-align: center;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            border: 2px solid currentColor;
+        }
+
+        .joystick-label {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #00ff88;
+            white-space: nowrap;
+        }
+
+        #joystick-left {
+            position: relative;
+        }
+
+        #joystick-right {
+            position: relative;
+        }
+
+        .angle-display {
+            font-size: 13px;
+            color: #00ffff;
+        }
+
+        .battery-warning {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .safety-notice {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 68, 68, 0.9);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+
+        @media (max-width: 768px) {
+            .control-container {
+                padding: 10px;
+            }
+
+            .joystick-zone {
+                width: 120px;
+                height: 120px;
+            }
+
+            .telemetry {
+                padding: 12px;
+                min-width: 160px;
+            }
+
+            .telemetry-item {
+                font-size: 12px;
+            }
+
+            .telemetry-item span {
+                font-size: 14px;
+            }
+        }
+
+        @media (orientation: landscape) {
+            .video-container {
+                height: 40vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="/" class="back-button">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <div class="connection-indicator">
+            <span>Connection</span>
+            <div id="connection-status"></div>
+        </div>
+    </div>
+
+    <div class="video-container">
+        <img src="{{ url_for('video_feed') }}" alt="Drone Camera">
+        <div class="video-overlay">
+            <div><i class="fas fa-video"></i> Live Feed</div>
+        </div>
+    </div>
+
+    <div class="control-container">
+        <!-- LEFT JOYSTICK: Throttle (Y) + Yaw (X) -->
+        <div style="position: relative;">
+            <div id="joystick-left" class="joystick-zone"></div>
+            <div class="joystick-label">THROTTLE / YAW</div>
+        </div>
+
+        <!-- CENTER TELEMETRY -->
+        <div class="telemetry">
+            <div class="telemetry-item">
+                <i class="fas fa-battery-full"></i>
+                <span id="battery-level">--%</span>
+            </div>
+            
+            <div class="telemetry-item">
+                <i class="fas fa-bolt"></i>
+                <span id="voltage-display">--V</span>
+            </div>
+
+            <div class="telemetry-item">
+                <i class="fas fa-tachometer-alt"></i>
+                <span id="throttle-display">1000</span> μs
+            </div>
+
+            <div class="telemetry-item angle-display">
+                <i class="fas fa-arrows-alt-h"></i>
+                Roll: <span id="roll-display">0.0°</span>
+            </div>
+
+            <div class="telemetry-item angle-display">
+                <i class="fas fa-arrows-alt-v"></i>
+                Pitch: <span id="pitch-display">0.0°</span>
+            </div>
+
+            <div class="telemetry-item angle-display">
+                <i class="fas fa-sync-alt"></i>
+                Yaw: <span id="yaw-display">0.0°/s</span>
+            </div>
+
+            <div style="margin-top: 10px;">
+                <div class="control-buttons">
+                    <button id="arm-button" class="arm-btn">
+                        <i class="fas fa-power-off"></i> ARM
+                    </button>
+                    <button id="disarm-button" class="disarm-btn">
+                        <i class="fas fa-stop"></i> DISARM
+                    </button>
+                </div>
+                <div id="armed-status" style="margin-top: 10px;">DISARMED</div>
+            </div>
+        </div>
+
+        <!-- RIGHT JOYSTICK: Pitch (Y) + Roll (X) -->
+        <div style="position: relative;">
+            <div id="joystick-right" class="joystick-zone"></div>
+            <div class="joystick-label">PITCH / ROLL</div>
+        </div>
+    </div>
+
+    <div class="safety-notice">
+        ⚠️ DOUBLE TAP SCREEN FOR EMERGENCY DISARM
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+    <script src="/static/filo.js"></script>
+</body>
+</html>
