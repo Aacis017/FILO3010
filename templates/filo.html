@@ -17,134 +17,254 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: #000;
             color: #fff;
             overflow: hidden;
             height: 100vh;
         }
 
-        .top-bar {
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px 20px;
+        /* Full screen video background */
+        .video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #000;
+        }
+
+        .video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Top overlay bar */
+        .top-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
+            padding: 15px 20px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            backdrop-filter: blur(10px);
+            align-items: flex-start;
         }
 
         .back-button {
-            color: #00ff88;
+            color: #fff;
             text-decoration: none;
             font-size: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
         }
 
-        .connection-indicator {
+        /* Top right telemetry */
+        .top-telemetry {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .telemetry-row {
+            display: flex;
+            gap: 15px;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            font-size: 14px;
+        }
+
+        .telem-item {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+        }
+
+        .telem-item i {
+            color: #00ff88;
         }
 
         #connection-status {
-            width: 16px;
-            height: 16px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             background: #666;
-            box-shadow: 0 0 10px currentColor;
+            display: inline-block;
         }
 
-        .video-container {
-            width: 100%;
-            height: 35vh;
-            background: #000;
+        #armed-status {
+            font-weight: bold;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 13px;
+        }
+
+        #armed-status.armed {
+            background: #ff4444;
+            color: #fff;
+        }
+
+        #armed-status.disarmed {
+            background: #666;
+            color: #ccc;
+        }
+
+        /* Center camera data overlay (DJI style) */
+        .center-hud {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            border: 2px solid rgba(0, 255, 136, 0.3);
+            gap: 30px;
+            pointer-events: none;
+        }
+
+        .attitude-indicator {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .angle-display {
+            text-align: center;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(0,255,136,0.3);
+        }
+
+        .angle-label {
+            font-size: 11px;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+
+        .angle-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .crosshair {
+            width: 40px;
+            height: 40px;
             position: relative;
         }
 
-        .video-container img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-
-        .video-overlay {
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 8px 12px;
-            border-radius: 5px;
-            font-size: 14px;
+            background: rgba(255,255,255,0.8);
         }
 
-        .control-container {
+        .crosshair::before {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .crosshair::after {
+            height: 2px;
+            width: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .throttle-indicator {
+            background: rgba(0,0,0,0.7);
+            padding: 12px 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(0,255,136,0.3);
+            text-align: center;
+        }
+
+        .throttle-label {
+            font-size: 11px;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+
+        .throttle-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        /* Bottom control area */
+        .bottom-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            padding: 20px;
             display: flex;
             justify-content: space-between;
+            align-items: flex-end;
+            background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+        }
+
+        .joystick-container {
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            padding: 20px;
-            height: calc(65vh - 60px);
-            position: relative;
+            gap: 10px;
         }
 
         .joystick-zone {
-            width: 150px;
-            height: 150px;
+            width: 160px;
+            height: 160px;
             background: rgba(255, 255, 255, 0.1);
-            border: 3px solid rgba(0, 255, 136, 0.5);
+            border: 2px solid rgba(0, 255, 136, 0.4);
             border-radius: 50%;
             position: relative;
+            backdrop-filter: blur(5px);
         }
 
-        .telemetry {
+        .joystick-label {
+            font-size: 12px;
+            color: #00ff88;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Center control buttons */
+        .center-controls {
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 20px;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0, 255, 136, 0.3);
-            min-width: 200px;
-        }
-
-        .telemetry-item {
-            display: flex;
+            gap: 12px;
             align-items: center;
-            gap: 10px;
-            font-size: 14px;
-        }
-
-        .telemetry-item i {
-            color: #00ff88;
-            font-size: 18px;
-            width: 24px;
-        }
-
-        .telemetry-item span {
-            font-weight: bold;
-            font-size: 16px;
-        }
-
-        .control-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
         }
 
         .arm-btn, .disarm-btn {
-            padding: 12px 24px;
+            padding: 15px 30px;
             border: none;
-            border-radius: 8px;
+            border-radius: 25px;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 15px;
             cursor: pointer;
             transition: all 0.3s;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            min-width: 140px;
         }
 
         .arm-btn {
@@ -158,9 +278,9 @@
         }
 
         .arm-btn:disabled {
-            background: #666;
+            background: #444;
+            color: #888;
             cursor: not-allowed;
-            opacity: 0.5;
         }
 
         .disarm-btn {
@@ -174,47 +294,42 @@
         }
 
         .disarm-btn:disabled {
-            background: #666;
+            background: #444;
+            color: #888;
             cursor: not-allowed;
-            opacity: 0.5;
         }
 
-        #armed-status {
-            font-size: 18px;
-            font-weight: bold;
-            color: #ff0000;
-            text-align: center;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 5px;
-            border: 2px solid currentColor;
+        .battery-indicator {
+            background: rgba(0,0,0,0.7);
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(5px);
         }
 
-        .joystick-label {
-            position: absolute;
-            bottom: -30px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 12px;
-            color: #00ff88;
-            white-space: nowrap;
+        .battery-bar {
+            width: 60px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
         }
 
-        #joystick-left {
-            position: relative;
+        .battery-fill {
+            height: 100%;
+            background: #00ff88;
+            transition: width 0.3s, background 0.3s;
         }
 
-        #joystick-right {
-            position: relative;
-        }
-
-        .angle-display {
-            font-size: 13px;
-            color: #00ffff;
-        }
-
-        .battery-warning {
+        .battery-fill.low {
+            background: #ff4444;
             animation: pulse 1s infinite;
+        }
+
+        .battery-fill.medium {
+            background: #ffaa00;
         }
 
         @keyframes pulse {
@@ -224,127 +339,145 @@
 
         .safety-notice {
             position: fixed;
-            bottom: 10px;
+            bottom: 200px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(255, 68, 68, 0.9);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 11px;
             font-weight: bold;
             z-index: 1000;
+            backdrop-filter: blur(10px);
         }
 
         @media (max-width: 768px) {
-            .control-container {
-                padding: 10px;
-            }
-
             .joystick-zone {
-                width: 120px;
-                height: 120px;
+                width: 130px;
+                height: 130px;
             }
 
-            .telemetry {
-                padding: 12px;
-                min-width: 160px;
+            .angle-value {
+                font-size: 20px;
             }
 
-            .telemetry-item {
-                font-size: 12px;
+            .throttle-value {
+                font-size: 24px;
             }
 
-            .telemetry-item span {
-                font-size: 14px;
+            .attitude-indicator {
+                gap: 25px;
             }
         }
 
-        @media (orientation: landscape) {
-            .video-container {
-                height: 40vh;
+        @media (orientation: landscape) and (max-height: 500px) {
+            .joystick-zone {
+                width: 110px;
+                height: 110px;
+            }
+
+            .bottom-controls {
+                padding: 10px;
+            }
+
+            .center-hud {
+                gap: 20px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="top-bar">
+    <!-- Full screen video -->
+    <div class="video-container">
+        <img src="{{ url_for('video_feed') }}" alt="Drone Camera">
+    </div>
+
+    <!-- Top overlay -->
+    <div class="top-overlay">
         <a href="/" class="back-button">
             <i class="fas fa-arrow-left"></i> Back
         </a>
-        <div class="connection-indicator">
-            <span>Connection</span>
-            <div id="connection-status"></div>
+
+        <div class="top-telemetry">
+            <div class="telemetry-row">
+                <div class="telem-item">
+                    <i class="fas fa-wifi"></i>
+                    <div id="connection-status"></div>
+                </div>
+                <div class="telem-item">
+                    <span id="armed-status" class="disarmed">DISARMED</span>
+                </div>
+            </div>
+            <div class="telemetry-row">
+                <div class="telem-item">
+                    <i class="fas fa-bolt"></i>
+                    <span id="voltage-display">--V</span>
+                </div>
+                <div class="telem-item">
+                    <i class="fas fa-sync-alt"></i>
+                    <span id="yaw-display">0.0°/s</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="video-container">
-        <img src="{{ url_for('video_feed') }}" alt="Drone Camera">
-        <div class="video-overlay">
-            <div><i class="fas fa-video"></i> Live Feed</div>
+    <!-- Center HUD (DJI style) -->
+    <div class="center-hud">
+        <div class="attitude-indicator">
+            <div class="angle-display">
+                <div class="angle-label">ROLL</div>
+                <div class="angle-value" id="roll-display">0.0°</div>
+            </div>
+
+            <div class="crosshair"></div>
+
+            <div class="angle-display">
+                <div class="angle-label">PITCH</div>
+                <div class="angle-value" id="pitch-display">0.0°</div>
+            </div>
+        </div>
+
+        <div class="throttle-indicator">
+            <div class="throttle-label">THROTTLE</div>
+            <div class="throttle-value" id="throttle-display">1000</div>
         </div>
     </div>
 
-    <div class="control-container">
-        <!-- LEFT JOYSTICK: Throttle (Y) + Yaw (X) -->
-        <div style="position: relative;">
+    <!-- Bottom controls -->
+    <div class="bottom-controls">
+        <!-- Left joystick: Throttle + Yaw -->
+        <div class="joystick-container">
             <div id="joystick-left" class="joystick-zone"></div>
-            <div class="joystick-label">THROTTLE / YAW</div>
+            <div class="joystick-label">Throttle • Yaw</div>
         </div>
 
-        <!-- CENTER TELEMETRY -->
-        <div class="telemetry">
-            <div class="telemetry-item">
+        <!-- Center buttons -->
+        <div class="center-controls">
+            <div class="battery-indicator">
                 <i class="fas fa-battery-full"></i>
+                <div class="battery-bar">
+                    <div class="battery-fill" id="battery-fill" style="width: 0%"></div>
+                </div>
                 <span id="battery-level">--%</span>
             </div>
             
-            <div class="telemetry-item">
-                <i class="fas fa-bolt"></i>
-                <span id="voltage-display">--V</span>
-            </div>
-
-            <div class="telemetry-item">
-                <i class="fas fa-tachometer-alt"></i>
-                <span id="throttle-display">1000</span> μs
-            </div>
-
-            <div class="telemetry-item angle-display">
-                <i class="fas fa-arrows-alt-h"></i>
-                Roll: <span id="roll-display">0.0°</span>
-            </div>
-
-            <div class="telemetry-item angle-display">
-                <i class="fas fa-arrows-alt-v"></i>
-                Pitch: <span id="pitch-display">0.0°</span>
-            </div>
-
-            <div class="telemetry-item angle-display">
-                <i class="fas fa-sync-alt"></i>
-                Yaw: <span id="yaw-display">0.0°/s</span>
-            </div>
-
-            <div style="margin-top: 10px;">
-                <div class="control-buttons">
-                    <button id="arm-button" class="arm-btn">
-                        <i class="fas fa-power-off"></i> ARM
-                    </button>
-                    <button id="disarm-button" class="disarm-btn">
-                        <i class="fas fa-stop"></i> DISARM
-                    </button>
-                </div>
-                <div id="armed-status" style="margin-top: 10px;">DISARMED</div>
-            </div>
+            <button id="arm-button" class="arm-btn">
+                <i class="fas fa-power-off"></i> ARM
+            </button>
+            <button id="disarm-button" class="disarm-btn">
+                <i class="fas fa-stop"></i> DISARM
+            </button>
         </div>
 
-        <!-- RIGHT JOYSTICK: Pitch (Y) + Roll (X) -->
-        <div style="position: relative;">
+        <!-- Right joystick: Pitch + Roll -->
+        <div class="joystick-container">
             <div id="joystick-right" class="joystick-zone"></div>
-            <div class="joystick-label">PITCH / ROLL</div>
+            <div class="joystick-label">Pitch • Roll</div>
         </div>
     </div>
 
     <div class="safety-notice">
-        ⚠️ DOUBLE TAP SCREEN FOR EMERGENCY DISARM
+        ⚠️ DOUBLE TAP FOR EMERGENCY STOP
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>

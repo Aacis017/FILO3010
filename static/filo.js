@@ -9,19 +9,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastTelemetryUpdate = Date.now();
     let commandInterval;
 
-    // Joystick state
+    // Joystick state - FIXED: Keep throttle at minimum when released
     const joystickState = {
         roll: 0.0,
         pitch: 0.0,
         yaw: 0.0,
-        throttle: -1.0  // Start at minimum
+        throttle: -1.0  // -1.0 = minimum (1000μs), +1.0 = maximum (2000μs)
     };
+
+    // Track if left joystick is being touched
+    let leftJoystickActive = false;
 
     // ============================================
     // EXPONENTIAL CURVE FOR SMOOTHER CONTROL
     // ============================================
     function applyExpo(value, expo = 0.3) {
-        // Applies exponential curve: gentler around center, more responsive at extremes
         return value * (1 - expo + expo * Math.abs(value));
     }
 
@@ -32,27 +34,43 @@ document.addEventListener('DOMContentLoaded', () => {
         zone: document.getElementById('joystick-left'),
         mode: 'static',
         position: { left: '50%', top: '50%' },
-        color: 'white',
-        size: 150
+        color: '#00ff88',
+        size: 160
     });
 
     const joystickRight = nipplejs.create({
         zone: document.getElementById('joystick-right'),
         mode: 'static',
         position: { left: '50%', top: '50%' },
-        color: 'white',
-        size: 150
+        color: '#00ff88',
+        size: 160
     });
 
     // LEFT joystick → throttle (Y) + yaw (X)
+    // FIXED: Properly map Y axis for throttle
+    joystickLeft.on('start', () => {
+        leftJoystickActive = true;
+    });
+
     joystickLeft.on('move', (evt, data) => {
-        joystickState.throttle = applyExpo(-data.vector.y);
+        leftJoystickActive = true;
+        
+        // Throttle: -1 (down/minimum) to +1 (up/maximum)
+        // data.vector.y: -1 (up) to +1 (down), so we negate it
+        joystickState.throttle = -data.vector.y;
+        
+        // Yaw: -1 (left) to +1 (right)
         joystickState.yaw = applyExpo(data.vector.x);
+        
+        console.log('Left Joystick - Throttle:', joystickState.throttle.toFixed(2), 'Yaw:', joystickState.yaw.toFixed(2));
     });
 
     joystickLeft.on('end', () => {
-        joystickState.throttle = -1.0;  // Return to minimum
+        leftJoystickActive = false;
+        // CRITICAL FIX: Return throttle to MINIMUM, not maximum!
+        joystickState.throttle = -1.0;  // -1.0 = minimum throttle
         joystickState.yaw = 0;
+        console.log('Left Joystick Released - Throttle reset to minimum (-1.0)');
     });
 
     // RIGHT joystick → pitch (Y) + roll (X)
@@ -93,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .then(data => {
             if (data.status === 'ok' && data.sent) {
-                const throttle = data.sent.throttle.toFixed(0);
+                const throttle = Math.round(data.sent.throttle);
                 document.getElementById('throttle-display').innerText = throttle;
             }
             if (data.telemetry) {
@@ -133,20 +151,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     armButton.addEventListener('click', () => {
         // Safety check: throttle must be at minimum
-        if (joystickState.throttle > -0.9) {
-            showAlert('⚠️ SAFETY: Lower throttle to minimum before arming!', 'warning');
+        if (joystickState.throttle > -0.85) {
+            showAlert('⚠️ SAFETY: Lower throttle to MINIMUM before arming!', 'warning');
+            console.log('Arm blocked - throttle not at minimum:', joystickState.throttle);
             return;
         }
 
-        if (confirm('⚠️ ARM MOTORS?\n\nMAKE SURE:\n- Drone is on flat surface\n- Area is clear\n- Props are secure\n- Battery is charged')) {
+        if (confirm('⚠️ ARM MOTORS?\n\nMAKE SURE:\n- Drone is on flat surface\n- Area is clear\n- Props are secure\n- Battery is charged\n- Throttle is at MINIMUM')) {
             fetch('/arm', { method: 'POST' })
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'ok') {
                     armed = true;
                     armedStatus.innerText = "ARMED";
-                    armedStatus.style.color = "#00ff00";
-                    armedStatus.style.fontWeight = "bold";
+                    armedStatus.className = "armed";
                     armButton.disabled = true;
                     disarmButton.disabled = false;
                     showAlert(data.message, 'success');
@@ -169,8 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             armed = false;
             armedStatus.innerText = "DISARMED";
-            armedStatus.style.color = "#ff0000";
-            armedStatus.style.fontWeight = "normal";
+            armedStatus.className = "disarmed";
             armButton.disabled = false;
             disarmButton.disabled = true;
             showAlert(data.message, 'info');
@@ -229,16 +246,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Battery
         const batteryLevel = document.getElementById('battery-level');
+        const batteryFill = document.getElementById('battery-fill');
         const batteryPercent = telem.battery_percent || 0;
         batteryLevel.textContent = `${batteryPercent}%`;
+        batteryFill.style.width = `${batteryPercent}%`;
         
         if (batteryPercent < 20) {
-            batteryLevel.style.color = '#ff0000';
-            batteryLevel.style.fontWeight = 'bold';
+            batteryFill.className = 'battery-fill low';
         } else if (batteryPercent < 40) {
-            batteryLevel.style.color = '#ffaa00';
+            batteryFill.className = 'battery-fill medium';
         } else {
-            batteryLevel.style.color = '#00ff00';
+            batteryFill.className = 'battery-fill';
         }
         
         // Voltage
@@ -256,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (telem.armed !== undefined && telem.armed !== armed) {
             armed = telem.armed;
             armedStatus.innerText = armed ? "ARMED" : "DISARMED";
-            armedStatus.style.color = armed ? "#00ff00" : "#ff0000";
+            armedStatus.className = armed ? "armed" : "disarmed";
             armButton.disabled = armed;
             disarmButton.disabled = !armed;
         }
@@ -328,19 +346,41 @@ document.addEventListener('DOMContentLoaded', () => {
     document.head.appendChild(style);
 
     // ============================================
-    // EMERGENCY DISARM (DOUBLE TAP SCREEN)
+    // EMERGENCY DISARM (TRIPLE TAP SCREEN)
     // ============================================
-    let lastTap = 0;
+    let tapCount = 0;
+    let tapTimer = null;
+    
     document.addEventListener('touchstart', (e) => {
-        const now = Date.now();
-        if (now - lastTap < 300) {
-            // Double tap detected
+        tapCount++;
+        
+        // Clear existing timer
+        if (tapTimer) {
+            clearTimeout(tapTimer);
+        }
+        
+        // Check for triple tap
+        if (tapCount === 3) {
             if (armed) {
                 fetch('/disarm', { method: 'POST' });
-                showAlert('🚨 EMERGENCY DISARM!', 'error');
+                showAlert('🚨 EMERGENCY DISARM - TRIPLE TAP!', 'error');
+                
+                // Visual feedback
+                document.body.style.backgroundColor = '#ff0000';
+                setTimeout(() => {
+                    document.body.style.backgroundColor = '#000';
+                }, 200);
+            } else {
+                showAlert('ℹ️ Triple tap detected (use when armed)', 'info');
             }
+            tapCount = 0;
+            return;
         }
-        lastTap = now;
+        
+        // Reset tap count after 500ms of no taps
+        tapTimer = setTimeout(() => {
+            tapCount = 0;
+        }, 500);
     });
 
     // ============================================
@@ -360,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(data => {
         armed = data.armed;
         armedStatus.innerText = armed ? "ARMED" : "DISARMED";
-        armedStatus.style.color = armed ? "#00ff00" : "#ff0000";
+        armedStatus.className = armed ? "armed" : "disarmed";
         armButton.disabled = armed;
         disarmButton.disabled = !armed;
         
@@ -372,5 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateConnectionStatus();
     });
 
-    console.log('🚁 Drone control initialized with safety features');
+    console.log('🚁 Drone control initialized - DJI style interface');
+    console.log('Throttle range: -1.0 (minimum) to +1.0 (maximum)');
 });
