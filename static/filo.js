@@ -254,19 +254,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const batteryFill = document.getElementById('battery-fill');
         const batteryPercent = telem.battery_percent || 0;
         
-        batteryLevel.textContent = `${batteryPercent}%`;
-        topBatteryLevel.textContent = `${batteryPercent}%`;
-        batteryFill.style.width = `${batteryPercent}%`;
+        if (batteryLevel) {
+            batteryLevel.textContent = `${batteryPercent}%`;
+        }
         
-        if (batteryPercent < 20) {
-            batteryFill.className = 'battery-fill low';
-            topBatteryLevel.style.color = '#ff4444';
-        } else if (batteryPercent < 40) {
-            batteryFill.className = 'battery-fill medium';
-            topBatteryLevel.style.color = '#ffaa00';
-        } else {
-            batteryFill.className = 'battery-fill';
-            topBatteryLevel.style.color = '#00ff88';
+        if (topBatteryLevel) {
+            topBatteryLevel.textContent = `${batteryPercent}%`;
+            
+            if (batteryPercent < 20) {
+                topBatteryLevel.style.color = '#ff4444';
+            } else if (batteryPercent < 40) {
+                topBatteryLevel.style.color = '#ffaa00';
+            } else {
+                topBatteryLevel.style.color = '#00ff88';
+            }
+        }
+        
+        if (batteryFill) {
+            batteryFill.style.width = `${batteryPercent}%`;
+            
+            if (batteryPercent < 20) {
+                batteryFill.className = 'battery-fill low';
+            } else if (batteryPercent < 40) {
+                batteryFill.className = 'battery-fill medium';
+            } else {
+                batteryFill.className = 'battery-fill';
+            }
         }
         
         // Voltage
@@ -276,9 +289,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Angles
-        document.getElementById('roll-display').textContent = (telem.roll || 0).toFixed(1) + '°';
-        document.getElementById('pitch-display').textContent = (telem.pitch || 0).toFixed(1) + '°';
-        document.getElementById('yaw-display').textContent = (telem.yaw_rate || 0).toFixed(1) + '°/s';
+        const rollDisplay = document.getElementById('roll-display');
+        const pitchDisplay = document.getElementById('pitch-display');
+        const yawDisplay = document.getElementById('yaw-display');
+        
+        if (rollDisplay) {
+            rollDisplay.textContent = (telem.roll || 0).toFixed(1) + '°';
+        }
+        if (pitchDisplay) {
+            pitchDisplay.textContent = (telem.pitch || 0).toFixed(1) + '°';
+        }
+        if (yawDisplay) {
+            yawDisplay.textContent = (telem.yaw_rate || 0).toFixed(1) + '°/s';
+        }
         
         // Armed status from telemetry
         if (telem.armed !== undefined && telem.armed !== armed) {
