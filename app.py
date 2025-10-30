@@ -180,6 +180,7 @@ def arm():
         
     armed = True
     telemetry["armed"] = True
+    joystick_state["throttle"] = -1.0
     
     return jsonify({
         "status": "ok",
