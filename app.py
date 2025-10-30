@@ -165,8 +165,6 @@ def joystick():
 @app.route('/arm', methods=['POST'])
 def arm():
     global armed
-    joystick_state["throttle"] = -1.0
-
     
     # Safety check: throttle must be at minimum
     if joystick_state["throttle"] > -0.9:
@@ -175,18 +173,51 @@ def arm():
             "message": "⚠️ Throttle must be at MINIMUM before arming!"
         }), 400
     
-    # Request Arduino to arm
+    # Request Arduino to arm and wait for response
     if arduino:
+        arduino.reset_input_buffer()  # Clear any old data
         arduino.write(b"ARM\n")
-        time.sleep(0.1)
         
-    armed = True
-    telemetry["armed"] = True
-    
-    return jsonify({
-        "status": "ok",
-        "message": "🟢 Motors ARMED - BE CAREFUL!"
-    })
+        # Wait for Arduino response (up to 2 seconds)
+        start_time = time.time()
+        arm_response = None
+        
+        while (time.time() - start_time) < 2.0:
+            if arduino.in_waiting:
+                try:
+                    line = arduino.readline().decode("utf-8", errors="ignore").strip()
+                    if "Motors ARMED" in line:
+                        armed = True
+                        telemetry["armed"] = True
+                        arm_response = "success"
+                        break
+                    elif "Pre-arm checks FAILED" in line or "❌" in line:
+                        arm_response = "failed"
+                        break
+                except:
+                    pass
+            time.sleep(0.05)
+        
+        if arm_response == "success":
+            return jsonify({
+                "status": "ok",
+                "message": "🟢 Motors ARMED - BE CAREFUL!"
+            })
+        elif arm_response == "failed":
+            return jsonify({
+                "status": "error",
+                "message": "❌ Pre-arm checks FAILED! Check: Battery, Level surface, IMU"
+            }), 400
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "⚠️ No response from flight controller"
+            }), 500
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "❌ Arduino not connected"
+        }), 500
 
 @app.route('/disarm', methods=['POST'])
 def disarm():
