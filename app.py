@@ -249,23 +249,52 @@ def read_from_arduino():
     if not arduino:
         return
     
+    buffer = ""  # Buffer for incomplete lines
+    
     while True:
         try:
-            raw_line = arduino.readline()
-            if raw_line:
-                line = raw_line.decode("utf-8", errors="ignore").strip()
-                if line:
+            if arduino.in_waiting:
+                # Read available bytes
+                raw_data = arduino.read(arduino.in_waiting)
+                decoded = raw_data.decode("utf-8", errors="ignore")
+                buffer += decoded
+                
+                # Process complete lines
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
+                    line = line.strip()
+                    
+                    if not line:
+                        continue
+                    
                     # Parse telemetry: TELEM,roll,pitch,yaw_rate,throttle,voltage,battery%,armed,FL,FR,RL,RR
                     if line.startswith("TELEM,"):
-                        parts = line.split(',')
-                        if len(parts) >= 8:
-                            telemetry["roll"] = float(parts[1])
-                            telemetry["pitch"] = float(parts[2])
-                            telemetry["yaw_rate"] = float(parts[3])
-                            telemetry["battery_voltage"] = float(parts[5])
-                            telemetry["battery_percent"] = int(float(parts[6]))
-                            telemetry["armed"] = parts[7] == "1"
-                            telemetry["connection"] = "connected"
+                        try:
+                            parts = line.split(',')
+                            if len(parts) >= 8:
+                                # Validate each field before parsing
+                                roll_str = parts[1].strip()
+                                pitch_str = parts[2].strip()
+                                yaw_str = parts[3].strip()
+                                volt_str = parts[5].strip()
+                                bat_str = parts[6].strip()
+                                
+                                # Only parse if fields look valid (contain only digits, dot, minus)
+                                if all(c in '0123456789.-' for c in roll_str):
+                                    telemetry["roll"] = float(roll_str)
+                                if all(c in '0123456789.-' for c in pitch_str):
+                                    telemetry["pitch"] = float(pitch_str)
+                                if all(c in '0123456789.-' for c in yaw_str):
+                                    telemetry["yaw_rate"] = float(yaw_str)
+                                if all(c in '0123456789.-' for c in volt_str):
+                                    telemetry["battery_voltage"] = float(volt_str)
+                                if all(c in '0123456789' for c in bat_str):
+                                    telemetry["battery_percent"] = int(float(bat_str))
+                                
+                                telemetry["armed"] = parts[7].strip() == "1"
+                                telemetry["connection"] = "connected"
+                        except (ValueError, IndexError) as e:
+                            print(f"⚠️ Telemetry parse error: {e} | Line: '{line}'")
                             
                     elif line.startswith("ACK,"):
                         print(f"✅ {line}")
@@ -282,25 +311,42 @@ def read_from_arduino():
                         with arm_response_lock:
                             arm_response = "failed"
                     
-                    elif line.startswith("🚨"):
+                    elif line.startswith("🚨") or line.startswith("EMERGENCY"):
                         print(f"⚠️ ALERT: {line}")
                         armed = False
                         telemetry["armed"] = False
                         
                     elif line.startswith("STATUS,"):
-                        parts = line.split(',')
-                        if len(parts) >= 5:
-                            telemetry["armed"] = parts[1] == "ARMED"
-                            telemetry["battery_voltage"] = float(parts[2])
-                            telemetry["roll"] = float(parts[3])
-                            telemetry["pitch"] = float(parts[4])
+                        try:
+                            parts = line.split(',')
+                            if len(parts) >= 5:
+                                telemetry["armed"] = parts[1].strip() == "ARMED"
+                                volt_str = parts[2].strip()
+                                roll_str = parts[3].strip()
+                                pitch_str = parts[4].strip()
+                                
+                                if all(c in '0123456789.-' for c in volt_str):
+                                    telemetry["battery_voltage"] = float(volt_str)
+                                if all(c in '0123456789.-' for c in roll_str):
+                                    telemetry["roll"] = float(roll_str)
+                                if all(c in '0123456789.-' for c in pitch_str):
+                                    telemetry["pitch"] = float(pitch_str)
+                        except (ValueError, IndexError) as e:
+                            print(f"⚠️ Status parse error: {e}")
+                    
+                    elif line.startswith("WARN:") or line.startswith("DEBUG:"):
+                        # Debug/warning messages - just print
+                        print(f"📡 {line}")
                     
                     else:
-                        print(f"📡 {line}")
+                        # Other messages
+                        if len(line) > 0 and not line.startswith('\x00'):
+                            print(f"📡 {line}")
                         
         except Exception as e:
-            print("⚠️ Serial read error:", e)
+            print(f"⚠️ Serial read error: {e}")
             telemetry["connection"] = "error"
+            buffer = ""  # Clear buffer on error
             time.sleep(1)
             
         time.sleep(0.02)
