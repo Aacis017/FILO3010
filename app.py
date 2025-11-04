@@ -4,172 +4,7 @@ import re
 
 app = Flask(__name__)
 armed = False
-autonomous_mode = False
-
-# ===========================
-# SAFETY CONFIGURATION
-# ===========================
-SAFETY_CONFIG = {
-    "max_flight_time": 300,        # 5 minutes max autonomous flight
-    "max_altitude": 300,           # 3 meters max (in cm)
-    "max_distance": 500,           # 5 meters max per move (in cm)
-    "max_rotation": 360,           # Max rotation per command
-    "min_battery_percent": 30,     # Min 30% battery
-    "max_consecutive_moves": 50,   # Max 50 movement commands
-    "require_takeoff_first": True, # Must start with takeoff
-    "require_land_last": True,     # Must end with land
-    "max_speed": 100,              # Max speed in cm/s
-    "geofence_enabled": True,      # Enable virtual boundaries
-}
-
-class SafetyValidator:
-    """Validates drone programs for safety before execution"""
-    
-    def __init__(self):
-        self.errors = []
-        self.warnings = []
-        
-    def validate_program(self, commands, telemetry):
-        """Comprehensive safety validation"""
-        self.errors = []
-        self.warnings = []
-        
-        # 1. Check battery
-        if telemetry['battery_percent'] < SAFETY_CONFIG['min_battery_percent']:
-            self.errors.append(
-                f"❌ Battery too low: {telemetry['battery_percent']}% "
-                f"(minimum: {SAFETY_CONFIG['min_battery_percent']}%)"
-            )
-        
-        # 2. Check command count
-        if len(commands) > SAFETY_CONFIG['max_consecutive_moves']:
-            self.errors.append(
-                f"❌ Too many commands: {len(commands)} "
-                f"(max: {SAFETY_CONFIG['max_consecutive_moves']})"
-            )
-        
-        # 3. Check for takeoff at start
-        if SAFETY_CONFIG['require_takeoff_first']:
-            if not commands or commands[0]['type'] != 'takeoff':
-                self.errors.append("❌ Program must start with TAKEOFF command")
-        
-        # 4. Check for land at end
-        if SAFETY_CONFIG['require_land_last']:
-            if not commands or commands[-1]['type'] not in ['land', 'emergency']:
-                self.errors.append("❌ Program must end with LAND command")
-        
-        # 5. Validate total flight time
-        total_time = sum(cmd.get('duration', 0) + cmd.get('delay', 0) 
-                        for cmd in commands)
-        if total_time > SAFETY_CONFIG['max_flight_time']:
-            self.errors.append(
-                f"❌ Flight time too long: {total_time:.1f}s "
-                f"(max: {SAFETY_CONFIG['max_flight_time']}s)"
-            )
-        
-        # 6. Validate individual commands
-        altitude = 0  # Track estimated altitude
-        total_distance = 0  # Track total travel distance
-        
-        for i, cmd in enumerate(commands):
-            cmd_errors = self._validate_command(cmd, i + 1, altitude)
-            self.errors.extend(cmd_errors)
-            
-            # Update altitude tracking
-            if cmd['type'] == 'takeoff':
-                altitude = 100  # Assume 1m takeoff
-            elif cmd['type'] == 'land':
-                altitude = 0
-            elif cmd['type'] == 'move':
-                # Estimate altitude change
-                if cmd.get('throttle', 1400) > 1450:
-                    altitude += 20
-                elif cmd.get('throttle', 1400) < 1350:
-                    altitude -= 20
-                
-                # Track horizontal distance
-                duration = cmd.get('duration', 0)
-                speed = 50  # cm/s estimate
-                total_distance += duration * speed
-        
-        # 7. Check total distance
-        if total_distance > SAFETY_CONFIG['max_distance'] * 3:
-            self.warnings.append(
-                f"⚠️ Total distance: {total_distance:.0f}cm - "
-                "Ensure adequate space"
-            )
-        
-        # 8. Check altitude safety
-        if altitude > SAFETY_CONFIG['max_altitude']:
-            self.errors.append(
-                f"❌ Estimated max altitude {altitude}cm exceeds "
-                f"limit of {SAFETY_CONFIG['max_altitude']}cm"
-            )
-        
-        return len(self.errors) == 0
-    
-    def _validate_command(self, cmd, cmd_num, current_altitude):
-        """Validate individual command"""
-        errors = []
-        
-        # Check movement distances
-        if cmd['type'] == 'move':
-            duration = cmd.get('duration', 0)
-            estimated_dist = duration * 50  # 50cm/s
-            
-            if estimated_dist > SAFETY_CONFIG['max_distance']:
-                errors.append(
-                    f"❌ Command {cmd_num}: Distance {estimated_dist:.0f}cm "
-                    f"exceeds max {SAFETY_CONFIG['max_distance']}cm"
-                )
-            
-            # Check angles aren't too extreme
-            pitch = abs(cmd.get('pitch', 0))
-            roll = abs(cmd.get('roll', 0))
-            
-            if pitch > 30:
-                errors.append(
-                    f"❌ Command {cmd_num}: Pitch angle {pitch}° too steep (max 30°)"
-                )
-            if roll > 30:
-                errors.append(
-                    f"❌ Command {cmd_num}: Roll angle {roll}° too steep (max 30°)"
-                )
-            
-            # Check throttle is reasonable
-            throttle = cmd.get('throttle', 1400)
-            if throttle > 1800:
-                errors.append(
-                    f"❌ Command {cmd_num}: Throttle {throttle} too high (max 1800)"
-                )
-            if throttle < 1100 and current_altitude > 50:
-                errors.append(
-                    f"⚠️ Command {cmd_num}: Low throttle while airborne"
-                )
-        
-        # Check rotation limits
-        if 'yaw' in cmd and abs(cmd['yaw']) > 45:
-            errors.append(
-                f"❌ Command {cmd_num}: Yaw rate {cmd['yaw']}°/s too high (max 45°/s)"
-            )
-        
-        # Validate duration
-        if cmd.get('duration', 0) > 30:
-            errors.append(
-                f"⚠️ Command {cmd_num}: Duration {cmd['duration']:.1f}s is very long"
-            )
-        
-        return errors
-    
-    def get_report(self):
-        """Get validation report"""
-        return {
-            "valid": len(self.errors) == 0,
-            "errors": self.errors,
-            "warnings": self.warnings
-        }
-
-validator = SafetyValidator()
+autonomous_mode = False  # Flag for autonomous flight
 
 # -------------------------
 # Arduino serial setup
@@ -227,8 +62,8 @@ telemetry = {
     "roll": 0.0,
     "pitch": 0.0,
     "yaw_rate": 0.0,
-    "battery_voltage": 11.1,
-    "battery_percent": 50,
+    "battery_voltage": 0.0,
+    "battery_percent": 0,
     "armed": False,
     "altitude": 0.0,
     "connection": "disconnected"
@@ -272,7 +107,6 @@ class DroneCommandExecutor:
     def __init__(self, arduino_connection):
         self.arduino = arduino_connection
         self.running = False
-        self.start_time = None
         
     def parse_and_execute(self, python_code):
         """Parse Python code and convert to Arduino commands"""
@@ -284,6 +118,7 @@ class DroneCommandExecutor:
             if not line or line.startswith('#') or line.startswith('import'):
                 continue
                 
+            # Parse filo commands
             cmd = self.parse_command(line)
             if cmd:
                 commands.append(cmd)
@@ -301,7 +136,7 @@ class DroneCommandExecutor:
         elif 'filo.land()' in line:
             return {'type': 'land', 'delay': 3.0}
         
-        # Stop/Hover
+        # Stop
         elif 'filo.stop()' in line:
             return {'type': 'hover', 'delay': 1.0}
         
@@ -309,89 +144,77 @@ class DroneCommandExecutor:
         elif 'filo.emergency()' in line:
             return {'type': 'emergency', 'delay': 0.0}
         
-        # Movement with distance - with safety limits
+        # Move commands with distance
         elif match := re.search(r'filo\.move_up\((\d+)\)', line):
-            dist = min(int(match.group(1)), SAFETY_CONFIG['max_distance'])
-            duration = dist / SAFETY_CONFIG['max_speed']
+            dist = int(match.group(1))
+            duration = dist / 50.0  # Assume ~50cm/s speed
             return {'type': 'move', 'pitch': 0, 'roll': 0, 'throttle': 1500, 'yaw': 0, 'duration': duration}
         
         elif match := re.search(r'filo\.move_down\((\d+)\)', line):
-            dist = min(int(match.group(1)), SAFETY_CONFIG['max_distance'])
-            duration = dist / SAFETY_CONFIG['max_speed']
+            dist = int(match.group(1))
+            duration = dist / 50.0
             return {'type': 'move', 'pitch': 0, 'roll': 0, 'throttle': 1300, 'yaw': 0, 'duration': duration}
         
         elif match := re.search(r'filo\.move_forward\((\d+)\)', line):
-            dist = min(int(match.group(1)), SAFETY_CONFIG['max_distance'])
-            duration = dist / SAFETY_CONFIG['max_speed']
+            dist = int(match.group(1))
+            duration = dist / 50.0
             return {'type': 'move', 'pitch': 15, 'roll': 0, 'throttle': 1400, 'yaw': 0, 'duration': duration}
         
         elif match := re.search(r'filo\.move_back\((\d+)\)', line):
-            dist = min(int(match.group(1)), SAFETY_CONFIG['max_distance'])
-            duration = dist / SAFETY_CONFIG['max_speed']
+            dist = int(match.group(1))
+            duration = dist / 50.0
             return {'type': 'move', 'pitch': -15, 'roll': 0, 'throttle': 1400, 'yaw': 0, 'duration': duration}
         
         elif match := re.search(r'filo\.move_left\((\d+)\)', line):
-            dist = min(int(match.group(1)), SAFETY_CONFIG['max_distance'])
-            duration = dist / SAFETY_CONFIG['max_speed']
+            dist = int(match.group(1))
+            duration = dist / 50.0
             return {'type': 'move', 'pitch': 0, 'roll': -15, 'throttle': 1400, 'yaw': 0, 'duration': duration}
         
         elif match := re.search(r'filo\.move_right\((\d+)\)', line):
-            dist = min(int(match.group(1)), SAFETY_CONFIG['max_distance'])
-            duration = dist / SAFETY_CONFIG['max_speed']
+            dist = int(match.group(1))
+            duration = dist / 50.0
             return {'type': 'move', 'pitch': 0, 'roll': 15, 'throttle': 1400, 'yaw': 0, 'duration': duration}
         
-        # Rotation with limits
+        # Rotate
         elif match := re.search(r'filo\.rotate_clockwise\((\d+)\)', line):
-            angle = min(int(match.group(1)), SAFETY_CONFIG['max_rotation'])
-            duration = angle / 90.0
+            angle = int(match.group(1))
+            duration = angle / 90.0  # Assume 90deg/s rotation
             return {'type': 'move', 'pitch': 0, 'roll': 0, 'throttle': 1400, 'yaw': 20, 'duration': duration}
         
         elif match := re.search(r'filo\.rotate_counter_clockwise\((\d+)\)', line):
-            angle = min(int(match.group(1)), SAFETY_CONFIG['max_rotation'])
+            angle = int(match.group(1))
             duration = angle / 90.0
             return {'type': 'move', 'pitch': 0, 'roll': 0, 'throttle': 1400, 'yaw': -20, 'duration': duration}
         
-        # Wait/Sleep with limit
+        # Wait/Sleep
         elif match := re.search(r'time\.sleep\((\d+(?:\.\d+)?)\)', line):
-            delay = min(float(match.group(1)), 30.0)  # Max 30s wait
+            delay = float(match.group(1))
             return {'type': 'wait', 'duration': delay}
         
-        # LED commands
+        # LED commands (placeholder - you'd need to implement on Arduino)
         elif 'filo.led_' in line:
             return {'type': 'led', 'command': line, 'delay': 0.1}
         
         return None
     
     def execute_commands(self, commands):
-        """Execute command sequence with runtime safety checks"""
+        """Execute command sequence on Arduino"""
         self.running = True
-        self.start_time = time.time()
         
         for i, cmd in enumerate(commands):
             if not self.running:
                 print("❌ Command execution stopped")
                 break
             
-            # Runtime safety check
-            elapsed = time.time() - self.start_time
-            if elapsed > SAFETY_CONFIG['max_flight_time']:
-                print("❌ Max flight time exceeded - emergency landing")
-                self.emergency_land()
-                break
-            
-            # Battery check
-            if telemetry['battery_percent'] < 20:
-                print("❌ Battery critical - emergency landing")
-                self.emergency_land()
-                break
-            
             print(f"📡 Executing command {i+1}/{len(commands)}: {cmd['type']}")
             
             if cmd['type'] == 'takeoff':
+                # Arm motors first
                 if not armed:
                     self.arduino.write(b"ARM\n")
                     time.sleep(2)
                 
+                # Gradual throttle increase for takeoff
                 for throttle in range(1000, 1500, 50):
                     command = f"CMD,0.00,0.00,{throttle:.0f},0.00\n"
                     self.arduino.write(command.encode("utf-8"))
@@ -400,28 +223,27 @@ class DroneCommandExecutor:
                 time.sleep(cmd['delay'])
             
             elif cmd['type'] == 'land':
+                # Gradual throttle decrease for landing
                 for throttle in range(1400, 1000, -50):
                     command = f"CMD,0.00,0.00,{throttle:.0f},0.00\n"
                     self.arduino.write(command.encode("utf-8"))
                     time.sleep(0.1)
                 
+                # Disarm
                 self.arduino.write(b"DISARM\n")
                 time.sleep(cmd['delay'])
             
             elif cmd['type'] == 'move':
+                # Send movement command
                 command = f"CMD,{cmd['roll']:.2f},{cmd['pitch']:.2f},{cmd['throttle']:.0f},{cmd['yaw']:.2f}\n"
                 
-                steps = int(cmd['duration'] * 20)
+                # Send command repeatedly during duration
+                steps = int(cmd['duration'] * 20)  # 20Hz update rate
                 for _ in range(max(1, steps)):
-                    # Check for extreme angles during movement
-                    if abs(telemetry['roll']) > 45 or abs(telemetry['pitch']) > 45:
-                        print("❌ Extreme angle detected - emergency landing")
-                        self.emergency_land()
-                        return
-                    
                     self.arduino.write(command.encode("utf-8"))
                     time.sleep(0.05)
                 
+                # Return to hover
                 hover_cmd = f"CMD,0.00,0.00,{cmd['throttle']:.0f},0.00\n"
                 self.arduino.write(hover_cmd.encode("utf-8"))
             
@@ -439,26 +261,17 @@ class DroneCommandExecutor:
                 time.sleep(cmd['duration'])
             
             elif cmd['type'] == 'led':
+                # LED commands would go here
                 print(f"💡 LED: {cmd['command']}")
                 time.sleep(cmd['delay'])
         
         self.running = False
         print("✅ Command sequence completed")
-    
-    def emergency_land(self):
-        """Emergency landing procedure"""
-        print("🚨 EMERGENCY LANDING")
-        for throttle in range(1400, 1000, -100):
-            command = f"CMD,0.00,0.00,{throttle:.0f},0.00\n"
-            self.arduino.write(command.encode("utf-8"))
-            time.sleep(0.2)
-        self.arduino.write(b"DISARM\n")
-        self.running = False
 
 executor = DroneCommandExecutor(arduino) if arduino else None
 
 # -------------------------
-# Blockly program execution endpoint
+# NEW: Blockly program execution endpoint
 # -------------------------
 @app.route('/run', methods=['POST'])
 def run_program():
@@ -497,31 +310,6 @@ def run_program():
         
         print(f"📋 Parsed {len(commands)} commands")
         
-        # SAFETY VALIDATION
-        print("🛡️ Running safety checks...")
-        is_safe = validator.validate_program(commands, telemetry)
-        report = validator.get_report()
-        
-        if not is_safe:
-            print("❌ Safety validation FAILED")
-            for error in report['errors']:
-                print(f"  {error}")
-            
-            return jsonify({
-                "status": "error",
-                "message": "Safety validation failed",
-                "errors": report['errors'],
-                "warnings": report['warnings']
-            }), 400
-        
-        # Show warnings but allow execution
-        if report['warnings']:
-            print("⚠️ Warnings:")
-            for warning in report['warnings']:
-                print(f"  {warning}")
-        
-        print("✅ Safety checks PASSED")
-        
         # Execute in background thread
         autonomous_mode = True
         thread = threading.Thread(
@@ -533,9 +321,8 @@ def run_program():
         
         return jsonify({
             "status": "success",
-            "message": f"✅ Executing {len(commands)} commands",
-            "commands": len(commands),
-            "warnings": report['warnings']
+            "message": f"Executing {len(commands)} commands",
+            "commands": len(commands)
         })
         
     except Exception as e:
@@ -552,22 +339,19 @@ def stop_program():
     
     if executor:
         executor.running = False
-        executor.emergency_land()
     
     autonomous_mode = False
     
+    if arduino:
+        arduino.write(b"DISARM\n")
+    
     return jsonify({
         "status": "success",
-        "message": "Program stopped and emergency landing initiated"
+        "message": "Program stopped"
     })
 
-@app.route('/safety_config', methods=['GET'])
-def get_safety_config():
-    """Get current safety configuration"""
-    return jsonify(SAFETY_CONFIG)
-
 # -------------------------
-# Flask routes (remaining routes same as before)
+# Flask routes
 # -------------------------
 @app.route('/')
 def index():
@@ -582,6 +366,9 @@ def video_feed():
 def filo():
     return render_template('filo.html')
 
+# -------------------------
+# Joystick state cache
+# -------------------------
 joystick_state = {
     "roll": 0.0,
     "pitch": 0.0,
@@ -595,6 +382,7 @@ last_command_time = time.time()
 def joystick():
     global joystick_state, armed, last_command_time, autonomous_mode
     
+    # Don't accept manual control during autonomous flight
     if autonomous_mode:
         return jsonify({
             "status": "error",
@@ -711,8 +499,7 @@ def get_status():
         "armed": armed,
         "autonomous": autonomous_mode,
         "telemetry": telemetry,
-        "connection": "connected" if arduino else "disconnected",
-        "safety_config": SAFETY_CONFIG
+        "connection": "connected" if arduino else "disconnected"
     })
 
 # -------------------------
@@ -818,19 +605,12 @@ watchdog_thread.start()
 # -------------------------
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("🚁 SECURE DRONE CONTROL SERVER")
+    print("🚁 DRONE CONTROL SERVER")
     print("="*50)
     print("📱 Manual Control: http://<ip>:5000/filo")
     print("🤖 Blockly Programming: http://<ip>:5000")
-    print("\n🛡️ SAFETY FEATURES ENABLED:")
-    print(f"   • Max flight time: {SAFETY_CONFIG['max_flight_time']}s")
-    print(f"   • Max altitude: {SAFETY_CONFIG['max_altitude']}cm")
-    print(f"   • Max distance per move: {SAFETY_CONFIG['max_distance']}cm")
-    print(f"   • Min battery: {SAFETY_CONFIG['min_battery_percent']}%")
-    print(f"   • Max commands: {SAFETY_CONFIG['max_consecutive_moves']}")
-    print(f"   • Require takeoff first: {SAFETY_CONFIG['require_takeoff_first']}")
-    print(f"   • Require land last: {SAFETY_CONFIG['require_land_last']}")
-    print("\n⚠️  ALWAYS test in safe environment!")
+    print("🔒 Safety features enabled")
+    print("⚠️  ALWAYS test in safe environment!")
     print("="*50 + "\n")
     
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
