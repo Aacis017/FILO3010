@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Robotix Japan Education</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/style.css">
   <script src="https://unpkg.com/blockly/blockly.min.js"></script>
   <script src="https://unpkg.com/blockly/blocks_compressed.js"></script>
   <script src="https://unpkg.com/blockly/python_compressed.js"></script>
@@ -13,17 +12,37 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
-  
- 
-  <body class="bg-gray-100 h-screen flex flex-col">
+  <style>
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    .status-connected { background-color: #10b981; }
+    .status-disconnected { background-color: #ef4444; }
+    .status-executing { background-color: #f59e0b; animation: pulse 1s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col">
   
   <!-- Top bar -->
   <header class="flex items-center justify-between bg-white shadow px-6 py-4">
-    <h1 class="text-xl font-bold">Robotix Japan</h1>
-        <a href="/filo" class="text-lg font-bold text-blue-500 hover:underline">Manual Control</a>
+    <h1 class="text-xl font-bold">🤖 Robotix Japan - Blockly Programming</h1>
+    <a href="/filo" class="text-lg font-bold text-blue-500 hover:underline">📱 Manual Control</a>
 
     <div class="flex items-center space-x-4">
-      <button id="centerBtn" class="p-3 bg-gray-200 hover:bg-gray-300 rounded-full text-lg">🌀</button>
+      <div id="statusDisplay" class="text-sm">
+        <span class="status-indicator status-disconnected"></span>
+        <span id="statusText">Disconnected</span>
+      </div>
+      <button id="centerBtn" class="p-3 bg-gray-200 hover:bg-gray-300 rounded-full text-lg" title="Center workspace">🌀</button>
+      <button id="stopBtn" class="p-3 bg-red-500 hover:bg-red-600 text-white rounded-full text-lg hidden" title="Emergency Stop">⏹️ STOP</button>
       <button id="startBtn" class="p-3 bg-green-500 hover:bg-green-600 text-white rounded-full text-lg">▶ Start</button>
     </div>
   </header>
@@ -34,25 +53,30 @@
     <div id="blocklyDiv" style="width: 70%"></div>
 
     <!-- Python code panel -->
-   <div id="codePanel" class="w-[30%] bg-[#2d2d2d] text-white flex flex-col">
-  <div class="flex justify-between items-center bg-[#1e1e1e] px-4 py-2 border-b border-gray-700">
-    <span class="text-sm">Python Code</span>
-    <button id="generateBtn" class="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-1 rounded">
-      Generate
-    </button>
-    <button id="loadBlocks" class="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-1 rounded">
-      Load
-    </button>
-  </div>
-  <textarea id="codeEditor"></textarea>
-</div>
-
-
+    <div id="codePanel" class="w-[30%] bg-[#2d2d2d] text-white flex flex-col">
+      <div class="flex justify-between items-center bg-[#1e1e1e] px-4 py-2 border-b border-gray-700">
+        <span class="text-sm">Python Code</span>
+        <div class="space-x-2">
+          <button id="generateBtn" class="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-1 rounded">
+            Generate
+          </button>
+          <button id="loadBlocks" class="bg-purple-500 hover:bg-purple-600 text-white text-sm px-3 py-1 rounded">
+            Load Blocks
+          </button>
+        </div>
+      </div>
+      <textarea id="codeEditor"></textarea>
+      
+      <!-- Console output -->
+      <div class="bg-[#1e1e1e] border-t border-gray-700 p-3 h-32 overflow-y-auto">
+        <div class="text-xs text-gray-400 mb-1">Console:</div>
+        <div id="console" class="text-xs text-green-400 font-mono"></div>
+      </div>
+    </div>
   </main>
 
   <!-- Toolbox -->
   <xml id="toolbox" style="display: none">
-
     <!-- MOTION -->
     <category name="Motion" colour="#4CAF50">
       <block type="takeoff"></block>
@@ -127,7 +151,6 @@
       <block type="text_length"></block>
       <block type="text_print"></block>
     </category>
-
   
     <!-- VARIABLES -->
     <category name="Variables" custom="VARIABLE" colour="%{BKY_VARIABLES_HUE}"></category>
@@ -138,12 +161,11 @@
       <block type="wifi_signal"></block>
       <block type="altitude"></block>
     </category>
-  
   </xml>
 
-<script src="/static/blockwitharray.js"></script>  
+  <script src="/static/blockwitharray.js"></script>  
   <script src="/static/generatorspy.js"></script>
-<script src="/static/main.js"></script>
+  <script src="/static/main.js"></script>
 
 </body>
 </html>
