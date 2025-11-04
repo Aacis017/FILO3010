@@ -162,6 +162,78 @@ function updateStatus(status, text) {
   }
 }
 
+function updateSafetyBadges(safetyConfig) {
+  const badgesEl = document.getElementById('safetyBadges');
+  if (!safetyConfig) return;
+  
+  badgesEl.innerHTML = `
+    <span class="safety-badge badge-safe">Max Alt: ${safetyConfig.max_altitude}cm</span>
+    <span class="safety-badge badge-safe">Max Dist: ${safetyConfig.max_distance}cm</span>
+    <span class="safety-badge badge-warning">Min Battery: ${safetyConfig.min_battery_percent}%</span>
+    <span class="safety-badge badge-safe">Max Time: ${safetyConfig.max_flight_time}s</span>
+  `;
+}
+
+function updateBatteryDisplay(telemetry) {
+  const batteryEl = document.getElementById('batteryDisplay');
+  if (!telemetry) return;
+  
+  const percent = telemetry.battery_percent || 0;
+  const voltage = telemetry.battery_voltage || 0;
+  const color = percent < 30 ? 'text-red-600' : percent < 50 ? 'text-yellow-600' : 'text-green-600';
+  
+  batteryEl.innerHTML = `<span class="${color}">🔋 ${percent}% (${voltage.toFixed(1)}V)</span>`;
+}
+
+// Validate button - check safety before running
+document.getElementById('validateBtn').addEventListener('click', function() {
+  const hasBlocks = workspace.getAllBlocks(false).length > 0;
+  const manualCode = editor.getValue().trim();
+  
+  let programToSend = '';
+  
+  if (hasBlocks) {
+    programToSend = python.pythonGenerator.workspaceToCode(workspace);
+  } else if (manualCode) {
+    programToSend = manualCode;
+  } else {
+    alert("⚠️ Please create blocks or write code first!");
+    return;
+  }
+  
+  logConsole("🛡️ Running safety validation...", 'info');
+  
+  const serverUrl = window.location.hostname === 'localhost' 
+    ? 'http://127.0.0.1:5000' 
+    : `http://${window.location.hostname}:5000`;
+  
+  // Dry-run validation
+  fetch(`${serverUrl}/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: programToSend, validate_only: true })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      logConsole("✅ Safety validation PASSED", 'success');
+      if (data.warnings && data.warnings.length > 0) {
+        data.warnings.forEach(w => logConsole(w, 'warning'));
+      }
+      alert("✅ Program is safe to execute!\n\n" + (data.warnings ? "Warnings:\n" + data.warnings.join("\n") : "No warnings"));
+    } else {
+      logConsole("❌ Safety validation FAILED", 'error');
+      if (data.errors) {
+        data.errors.forEach(e => logConsole(e, 'error'));
+      }
+      alert("❌ Program failed safety checks:\n\n" + (data.errors ? data.errors.join("\n") : data.message));
+    }
+  })
+  .catch(err => {
+    logConsole(`❌ Validation error: ${err.message}`, 'error');
+  });
+});
+
 // Start button - sends either Blockly-generated code OR manually written Python code
 document.getElementById("startBtn").addEventListener("click", () => {
     const hasBlocks = workspace.getAllBlocks(false).length > 0;
@@ -180,10 +252,27 @@ document.getElementById("startBtn").addEventListener("click", () => {
       return;
     }
     
+    // Show safety confirmation
+    const confirmed = confirm(
+      "🚁 DRONE FLIGHT SAFETY CHECKLIST\n\n" +
+      "Before starting, confirm:\n" +
+      "✓ Drone is on flat, stable surface\n" +
+      "✓ Battery is sufficiently charged\n" +
+      "✓ Area is clear of people and obstacles\n" +
+      "✓ You have clear view of the drone\n" +
+      "✓ Emergency stop is ready\n" +
+      "✓ You understand the program behavior\n\n" +
+      "Are you ready to start the program?"
+    );
+    
+    if (!confirmed) {
+      logConsole("⚠️ Flight cancelled by user", 'warning');
+      return;
+    }
+    
     console.log("Program to send:", programToSend);
     updateStatus('executing', 'Executing...');
     
-    // Update server URL based on your setup
     const serverUrl = window.location.hostname === 'localhost' 
       ? 'http://127.0.0.1:5000' 
       : `http://${window.location.hostname}:5000`;
@@ -198,12 +287,23 @@ document.getElementById("startBtn").addEventListener("click", () => {
       if (data.status === 'success') {
         logConsole(`✅ ${data.message}`, 'success');
         logConsole(`📋 Executing ${data.commands} commands`, 'info');
-        updateStatus('executing', 'Program Running');
         
-        // Poll for completion
+        // Show warnings if any
+        if (data.warnings && data.warnings.length > 0) {
+          data.warnings.forEach(w => logConsole(w, 'warning'));
+        }
+        
+        updateStatus('executing', 'Program Running');
         checkProgramStatus();
       } else {
         logConsole(`❌ Error: ${data.message}`, 'error');
+        
+        // Show all errors
+        if (data.errors && data.errors.length > 0) {
+          data.errors.forEach(e => logConsole(e, 'error'));
+          alert("❌ Safety validation failed:\n\n" + data.errors.join("\n"));
+        }
+        
         updateStatus('connected', 'Ready');
       }
     })
@@ -269,6 +369,16 @@ setTimeout(() => {
       if (data.connection === 'connected') {
         updateStatus('connected', 'Ready');
         logConsole('✅ Connected to drone server', 'success');
+        
+        // Update safety badges
+        if (data.safety_config) {
+          updateSafetyBadges(data.safety_config);
+        }
+        
+        // Update battery display
+        if (data.telemetry) {
+          updateBatteryDisplay(data.telemetry);
+        }
       }
     })
     .catch(() => {
@@ -276,3 +386,19 @@ setTimeout(() => {
       logConsole('❌ Server not reachable', 'error');
     });
 }, 500);
+
+// Periodic telemetry update
+setInterval(() => {
+  const serverUrl = window.location.hostname === 'localhost' 
+    ? 'http://127.0.0.1:5000' 
+    : `http://${window.location.hostname}:5000`;
+  
+  fetch(`${serverUrl}/telemetry`)
+    .then(res => res.json())
+    .then(data => {
+      updateBatteryDisplay(data);
+    })
+    .catch(() => {
+      // Silently fail
+    });
+}, 2000);
