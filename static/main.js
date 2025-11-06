@@ -1,3 +1,5 @@
+//main.js
+
 // Initialize Blockly
 var workspace = Blockly.inject('blocklyDiv', {
   toolbox: document.getElementById('toolbox'),
