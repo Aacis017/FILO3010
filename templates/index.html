@@ -2,1355 +2,170 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>🚁 Robotix Drone Academy</title>
+  <title>Robotix Japan Education</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/blockly/blockly.min.js"></script>
   <script src="https://unpkg.com/blockly/blocks_compressed.js"></script>
   <script src="https://unpkg.com/blockly/python_compressed.js"></script>
   <script src="https://unpkg.com/blockly/msg/js/en.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
   <style>
-    * { font-family: 'Poppins', sans-serif; }
-    
-    body {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      overflow: hidden;
-    }
-
-    /* Animated background particles */
-    .bg-particles {
-      position: fixed;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-    }
-    
-    .particle {
-      position: absolute;
-      background: white;
-      border-radius: 50%;
-      opacity: 0.1;
-      animation: float 20s infinite ease-in-out;
-    }
-    
-    @keyframes float {
-      0%, 100% { transform: translateY(0px) translateX(0px); }
-      33% { transform: translateY(-30px) translateX(20px); }
-      66% { transform: translateY(-15px) translateX(-20px); }
-    }
-
-    /* Status indicators with glow */
     .status-indicator {
-      width: 14px;
-      height: 14px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       display: inline-block;
       margin-right: 8px;
-      box-shadow: 0 0 10px currentColor;
-      animation: pulse-glow 2s infinite;
     }
-    
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.7; transform: scale(1.1); }
-    }
-    
-    .status-connected { background: #10b981; box-shadow: 0 0 15px #10b981; }
-    .status-disconnected { background: #ef4444; box-shadow: 0 0 15px #ef4444; }
-    .status-executing { background: #f59e0b; animation: pulse-fast 0.5s infinite; }
-    
-    @keyframes pulse-fast {
+    .status-connected { background-color: #10b981; }
+    .status-disconnected { background-color: #ef4444; }
+    .status-executing { background-color: #f59e0b; animation: pulse 1s infinite; }
+    @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    /* Cool button styles */
-    .cool-btn {
-      position: relative;
-      overflow: hidden;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-    
-    .cool-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-    }
-    
-    .cool-btn:active {
-      transform: translateY(0px);
-    }
-
-    .cool-btn::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 0;
-      height: 0;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.3);
-      transform: translate(-50%, -50%);
-      transition: width 0.6s, height 0.6s;
-    }
-    
-    .cool-btn:active::before {
-      width: 300px;
-      height: 300px;
-    }
-
-    /* Glassmorphism panels */
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    }
-
-    /* Blockly workspace enhancement */
-    #blocklyDiv {
-      border-radius: 20px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-      overflow: hidden;
-    }
-
-    /* Code panel styling */
-    .code-panel {
-      background: linear-gradient(145deg, #1e1e1e, #2d2d2d);
-      border-radius: 20px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-      overflow: hidden;
-    }
-
-    .CodeMirror {
-      height: 100% !important;
-      background: transparent !important;
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 14px;
-    }
-
-    /* Console styling */
-    .console-output {
-      background: rgba(0,0,0,0.5);
-      border-radius: 10px;
-      font-family: 'Courier New', monospace;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
-    /* Custom scrollbar */
-    .console-output::-webkit-scrollbar {
-      width: 8px;
-    }
-    
-    .console-output::-webkit-scrollbar-track {
-      background: rgba(255,255,255,0.1);
-      border-radius: 10px;
-    }
-    
-    .console-output::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.3);
-      border-radius: 10px;
-    }
-
-    /* Tab styling */
-    .tab-btn {
-      transition: all 0.3s ease;
-      border-radius: 10px 10px 0 0;
-    }
-    
-    .tab-btn.active {
-      background: linear-gradient(145deg, #667eea, #764ba2);
-      color: white;
-      box-shadow: 0 -3px 10px rgba(0,0,0,0.2);
-    }
-
-    /* Tutorial tooltips */
-    .tooltip {
-      position: relative;
-    }
-    
-    .tooltip:hover::after {
-      content: attr(data-tip);
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.9);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 8px;
-      white-space: nowrap;
-      font-size: 12px;
-      z-index: 1000;
-      margin-bottom: 8px;
-    }
-
-    /* Fun loading animation */
-    @keyframes rotate-drone {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    .loading-drone {
-      animation: rotate-drone 2s linear infinite;
-    }
-
-    /* Achievement badges */
-    .badge {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      margin: 4px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      animation: badge-pop 0.5s ease;
-    }
-    
-    @keyframes badge-pop {
-      0% { transform: scale(0); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-
-    /* Header gradient animation */
-    .gradient-text {
-      background: linear-gradient(90deg, #ffd700, #ff6b6b, #4ecdc4, #ffd700);
-      background-size: 200% 200%;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: gradient-shift 3s ease infinite;
-    }
-    
-    @keyframes gradient-shift {
-      0%, 100% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-    }
-
-    /* Mission counter */
-    .mission-counter {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      border-radius: 15px;
-      padding: 12px 20px;
-      box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+      50% { opacity: 0.5; }
     }
   </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
+<body class="bg-gray-100 h-screen flex flex-col">
   
-  <!-- Animated background particles -->
-  <div class="bg-particles" id="particles"></div>
+  <!-- Top bar -->
+  <header class="flex items-center justify-between bg-white shadow px-6 py-4">
+    <h1 class="text-xl font-bold">🤖 Robotix Japan - Blockly Programming</h1>
+    <a href="/filo" class="text-lg font-bold text-blue-500 hover:underline">📱 Manual Control</a>
 
-  <!-- Top Navigation Bar -->
-  <header class="glass-panel relative z-10 px-6 py-4">
-    <div class="flex items-center justify-between">
-      <!-- Logo & Title -->
-      <div class="flex items-center space-x-4">
-        <div class="text-4xl loading-drone">🚁</div>
-        <div>
-          <h1 class="text-2xl font-bold text-white gradient-text">Robotix Drone Academy</h1>
-          <p class="text-xs text-white/70">Learn to code by flying! ✨</p>
-        </div>
+    <div class="flex items-center space-x-4">
+      <div id="statusDisplay" class="text-sm">
+        <span class="status-indicator status-disconnected"></span>
+        <span id="statusText">Disconnected</span>
       </div>
-
-      <!-- Mission Stats -->
-      <div class="mission-counter text-white">
-        <div class="text-xs font-semibold">MISSIONS COMPLETED</div>
-        <div class="text-2xl font-bold text-center" id="missionCount">0</div>
-      </div>
-
-      <!-- Status & Controls -->
-      <div class="flex items-center space-x-3">
-        <!-- Connection Status -->
-        <div class="glass-panel px-4 py-2 rounded-full" id="statusDisplay">
-          <span class="status-indicator status-disconnected"></span>
-          <span class="text-white text-sm font-semibold" id="statusText">Connecting...</span>
-        </div>
-
-        <!-- Manual Control Link -->
-        <a href="/filo" class="cool-btn bg-purple-500 hover:bg-purple-600 text-white px-5 py-2 rounded-full font-semibold text-sm">
-          🎮 Manual Control
-        </a>
-
-        <!-- Action Buttons -->
-        <button id="centerBtn" class="cool-btn bg-white/20 hover:bg-white/30 text-white p-3 rounded-full tooltip" data-tip="Center Workspace">
-          🎯
-        </button>
-        
-        <button id="stopBtn" class="cool-btn bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-full font-bold text-sm hidden">
-          ⏹️ EMERGENCY STOP
-        </button>
-        
-        <button id="startBtn" class="cool-btn bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg">
-          ▶ START MISSION
-        </button>
-      </div>
+      <button id="centerBtn" class="p-3 bg-gray-200 hover:bg-gray-300 rounded-full text-lg" title="Center workspace">🌀</button>
+      <button id="stopBtn" class="p-3 bg-red-500 hover:bg-red-600 text-white rounded-full text-lg hidden" title="Emergency Stop">⏹️ STOP</button>
+      <button id="startBtn" class="p-3 bg-green-500 hover:bg-green-600 text-white rounded-full text-lg">▶ Start</button>
     </div>
   </header>
 
-  <!-- Main Content Area -->
-  <main class="flex-1 flex overflow-hidden p-4 space-x-4 relative z-10">
-    
-    <!-- Left: Blockly Workspace -->
-    <div class="flex-1 flex flex-col space-y-3">
-      <!-- Workspace Header -->
-      <div class="glass-panel px-4 py-2 rounded-xl flex items-center justify-between">
-        <div class="flex items-center space-x-2">
-          <span class="text-2xl">🧩</span>
-          <span class="text-white font-semibold">Block Programming</span>
-        </div>
-        <div class="flex space-x-2">
-          <button class="cool-btn bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-xs font-semibold" id="tutorialBtn">
-            📚 Tutorial
+  <!-- Content -->
+  <main class="flex-1 flex overflow-hidden">
+    <!-- Blockly workspace -->
+    <div id="blocklyDiv" style="width: 70%"></div>
+
+    <!-- Python code panel -->
+    <div id="codePanel" class="w-[30%] bg-[#2d2d2d] text-white flex flex-col">
+      <div class="flex justify-between items-center bg-[#1e1e1e] px-4 py-2 border-b border-gray-700">
+        <span class="text-sm">Python Code</span>
+        <div class="space-x-2">
+          <button id="generateBtn" class="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-1 rounded">
+            Generate
           </button>
-          <button class="cool-btn bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold" id="examplesBtn">
-            💡 Examples
+          <button id="loadBlocks" class="bg-purple-500 hover:bg-purple-600 text-white text-sm px-3 py-1 rounded">
+            Load Blocks
           </button>
         </div>
       </div>
+      <textarea id="codeEditor"></textarea>
       
-      <!-- Blockly Workspace -->
-      <div id="blocklyDiv" class="flex-1 bg-white"></div>
-      
-      <!-- Quick Actions -->
-      <div class="glass-panel px-4 py-3 rounded-xl flex items-center justify-between">
-        <div class="flex space-x-2">
-          <div class="badge bg-green-500 text-white">Blocks: <span id="blockCount">0</span></div>
-          <div class="badge bg-blue-500 text-white">Lines: <span id="lineCount">0</span></div>
-        </div>
-        <div class="flex space-x-2">
-          <button class="cool-btn bg-red-500/80 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-xs font-semibold" id="clearBtn">
-            🗑️ Clear All
-          </button>
-          <button class="cool-btn bg-purple-500/80 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-xs font-semibold" id="saveBtn">
-            💾 Save
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right: Code & Console Panel -->
-    <div class="w-[35%] flex flex-col space-y-3">
-      
-      <!-- Tab Selector -->
-      <div class="glass-panel rounded-xl p-2 flex space-x-2">
-        <button class="tab-btn active flex-1 py-2 px-4 text-white font-semibold text-sm" data-tab="code">
-          💻 Python Code
-        </button>
-        <button class="tab-btn flex-1 py-2 px-4 text-white font-semibold text-sm" data-tab="console">
-          📡 Console
-        </button>
-      </div>
-
-      <!-- Code Panel -->
-      <div class="code-panel flex-1 flex flex-col" id="codeTab">
-        <div class="flex justify-between items-center bg-black/40 px-4 py-3 border-b border-white/10">
-          <div class="flex items-center space-x-2">
-            <span class="text-green-400 text-sm">●</span>
-            <span class="text-white text-sm font-semibold">main.py</span>
-          </div>
-          <div class="flex space-x-2">
-            <button id="generateBtn" class="cool-btn bg-blue-500 hover:bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-semibold">
-              ⚡ Generate
-            </button>
-            <button id="loadBlocks" class="cool-btn bg-purple-500 hover:bg-purple-600 text-white text-xs px-4 py-2 rounded-lg font-semibold">
-              📥 Load Blocks
-            </button>
-          </div>
-        </div>
-        <textarea id="codeEditor" class="flex-1"></textarea>
-      </div>
-
-      <!-- Console Panel (hidden by default) -->
-      <div class="code-panel flex-1 flex-col hidden" id="consoleTab">
-        <div class="bg-black/40 px-4 py-3 border-b border-white/10">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <span class="text-green-400">▶</span>
-              <span class="text-white text-sm font-semibold">Mission Console</span>
-            </div>
-            <button id="clearConsole" class="text-white/60 hover:text-white text-xs">Clear</button>
-          </div>
-        </div>
-        <div class="console-output flex-1 p-4 overflow-y-auto" id="console">
-          <div class="text-green-400 text-xs">🤖 Ready to fly! Build your program and click START MISSION.</div>
-        </div>
-      </div>
-
-      <!-- Achievement Section -->
-      <div class="glass-panel rounded-xl p-4">
-        <div class="flex items-center space-x-2 mb-3">
-          <span class="text-xl">🏆</span>
-          <span class="text-white font-semibold text-sm">Recent Achievements</span>
-        </div>
-        <div id="achievements" class="flex flex-wrap">
-          <div class="badge bg-gray-600 text-white">🚀 First Flight - Locked</div>
-          <div class="badge bg-gray-600 text-white">🔄 Loop Master - Locked</div>
-          <div class="badge bg-gray-600 text-white">🎨 LED Artist - Locked</div>
-        </div>
+      <!-- Console output -->
+      <div class="bg-[#1e1e1e] border-t border-gray-700 p-3 h-32 overflow-y-auto">
+        <div class="text-xs text-gray-400 mb-1">Console:</div>
+        <div id="console" class="text-xs text-green-400 font-mono"></div>
       </div>
     </div>
   </main>
 
-  <!-- Toolbox (Blockly Categories) -->
+  <!-- Toolbox -->
   <xml id="toolbox" style="display: none">
-    
-    <!-- FLIGHT BASICS -->
-    <category name="🚁 Flight Basics" colour="#4CAF50">
-      <block type="takeoff">
-        <comment pinned="false" h="80" w="160">Makes the drone take off and hover</comment>
-      </block>
-      <block type="land">
-        <comment pinned="false" h="80" w="160">Safely lands the drone</comment>
-      </block>
-      <block type="stop">
-        <comment pinned="false" h="80" w="160">Stops movement and hovers in place</comment>
-      </block>
-      <block type="emergency">
-        <comment pinned="false" h="80" w="160">EMERGENCY: Immediately cuts motors!</comment>
-      </block>
-    </category>
-  
-    <!-- MOVEMENT -->
-    <category name="🎮 Movement" colour="#2196F3">
-      <block type="up">
-        <field name="DIST">50</field>
-      </block>
-      <block type="down">
-        <field name="DIST">50</field>
-      </block>
-      <block type="forward">
-        <field name="DIST">100</field>
-      </block>
-      <block type="back">
-        <field name="DIST">100</field>
-      </block>
-      <block type="left">
-        <field name="DIST">100</field>
-      </block>
-      <block type="right">
-        <field name="DIST">100</field>
-      </block>
-    </category>
-
-    <!-- ROTATION -->
-    <category name="🔄 Rotation & Flips" colour="#FF9800">
-      <block type="rotate_cw">
-        <field name="ANGLE">90</field>
-      </block>
-      <block type="rotate_ccw">
-        <field name="ANGLE">90</field>
-      </block>
+    <!-- MOTION -->
+    <category name="Motion" colour="#4CAF50">
+      <block type="takeoff"></block>
+      <block type="land"></block>
+      <block type="stop"></block>
+      <block type="emergency"></block>
+      <block type="up"></block>
+      <block type="down"></block>
+      <block type="forward"></block>
+      <block type="back"></block>
+      <block type="left"></block>
+      <block type="right"></block>
+      <block type="rotate_cw"></block>
+      <block type="rotate_ccw"></block>
       <block type="flip_front"></block>
       <block type="flip_back"></block>
       <block type="flip_left"></block>
       <block type="flip_right"></block>
+      <block type="setspeed"></block>
+      <block type="go"></block>
+      <block type="curve"></block>
     </category>
   
-    <!-- WAIT -->
-    <category name="⏱️ Timing" colour="#9C27B0">
-      <block type="wait_seconds">
-        <field name="SEC">1</field>
-      </block>
-    </category>
-  
-    <!-- LIGHTS -->
-    <category name="💡 LED Lights" colour="#E91E63">
-      <block type="led_color">
-        <field name="COLOR">red</field>
-      </block>
-      <block type="led_rgb">
-        <field name="R">255</field>
-        <field name="G">0</field>
-        <field name="B">0</field>
-      </block>
-      <block type="led_breathe">
-        <field name="R">0</field>
-        <field name="G">255</field>
-        <field name="B">0</field>
-        <field name="SP">2</field>
-      </block>
-      <block type="led_flash">
-        <field name="R">255</field>
-        <field name="G">255</field>
-        <field name="B">0</field>
-        <field name="SP">5</field>
-      </block>
-    </category>
-  
-    <!-- LOGIC & LOOPS -->
-    <category name="🧠 Logic" colour="#5C6BC0">
+    <!-- CONTROL -->
+    <category name="Control" colour="#FF9800">
       <block type="controls_if"></block>
-      <block type="logic_compare">
-        <field name="OP">GT</field>
-      </block>
+      <block type="controls_repeat_ext"></block>
+      <block type="controls_whileUntil"></block>
+      <block type="controls_for"></block>
+      <block type="controls_flow_statements"></block>
+      <block type="wait_seconds"></block>
+    </category>
+  
+    <!-- LIGHT -->
+    <category name="Light" colour="#E91E63">
+      <block type="led_color"></block>
+      <block type="led_rgb"></block>
+      <block type="led_breathe"></block>
+      <block type="led_flash"></block>
+    </category>
+  
+    <!-- OPERATOR -->
+    <category name="Logic" colour="%{BKY_LOGIC_HUE}">
+      <block type="controls_if"></block>
+      <block type="logic_compare"></block>
       <block type="logic_operation"></block>
       <block type="logic_negate"></block>
       <block type="logic_boolean"></block>
     </category>
 
-    <category name="🔁 Loops" colour="#00897B">
+    <category name="Loops" colour="%{BKY_LOOPS_HUE}">
       <block type="controls_repeat_ext">
         <value name="TIMES">
           <shadow type="math_number">
-            <field name="NUM">4</field>
+            <field name="NUM">10</field>
           </shadow>
         </value>
       </block>
       <block type="controls_whileUntil"></block>
-      <block type="controls_for"></block>
     </category>
 
-    <!-- MATH & TEXT -->
-    <category name="🔢 Math" colour="#FF6F00">
+    <category name="Math" colour="%{BKY_MATH_HUE}">
       <block type="math_number">
-        <field name="NUM">10</field>
+        <field name="NUM">123</field>
       </block>
       <block type="math_arithmetic"></block>
       <block type="math_single"></block>
     </category>
 
-    <category name="📝 Text" colour="#795548">
+    <category name="Text" colour="%{BKY_TEXTS_HUE}">
       <block type="text"></block>
+      <block type="text_length"></block>
       <block type="text_print"></block>
     </category>
   
     <!-- VARIABLES -->
-    <category name="📦 Variables" custom="VARIABLE" colour="#A55EEA"></category>
+    <category name="Variables" custom="VARIABLE" colour="%{BKY_VARIABLES_HUE}"></category>
   
-    <!-- SENSORS -->
-    <category name="📊 Sensors" colour="#607D8B">
-      <block type="battery_level">
-        <comment pinned="false" h="60" w="140">Returns battery % (0-100)</comment>
-      </block>
-      <block type="altitude">
-        <comment pinned="false" h="60" w="140">Returns height in cm</comment>
-      </block>
+    <!-- SENSING -->
+    <category name="Sensing" colour="#9C27B0">
+      <block type="battery_level"></block>
+      <block type="wifi_signal"></block>
+      <block type="altitude"></block>
     </category>
   </xml>
 
-  <script>
-    // Create animated particles
-    const particlesContainer = document.getElementById('particles');
-    for (let i = 0; i < 20; i++) {
-      const particle = document.createElement('div');
-      particle.className = 'particle';
-      particle.style.width = Math.random() * 4 + 2 + 'px';
-      particle.style.height = particle.style.width;
-      particle.style.left = Math.random() * 100 + '%';
-      particle.style.top = Math.random() * 100 + '%';
-      particle.style.animationDelay = Math.random() * 20 + 's';
-      particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
-      particlesContainer.appendChild(particle);
-    }
+  <script src="/static/blockwitharray.js"></script>  
+  <script src="/static/generatorspy.js"></script>
+  <script src="/static/main.js"></script>
 
-    // Define custom blocks with better descriptions
-    Blockly.defineBlocksWithJsonArray([
-      { 
-        "type": "takeoff", 
-        "message0": "🚁 Takeoff", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#4CAF50",
-        "tooltip": "Make the drone take off and hover at a safe height",
-        "helpUrl": ""
-      },
-      { 
-        "type": "land", 
-        "message0": "🛬 Land", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#4CAF50",
-        "tooltip": "Safely land the drone"
-      },
-      { 
-        "type": "stop", 
-        "message0": "⏸️ Stop (hover)", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#4CAF50",
-        "tooltip": "Stop all movement and hover in place"
-      },
-      { 
-        "type": "emergency", 
-        "message0": "🚨 Emergency Stop", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#F44336",
-        "tooltip": "⚠️ WARNING: Immediately cuts power to motors!"
-      },
-      { 
-        "type": "up", 
-        "message0": "⬆️ Move Up %1 cm", 
-        "args0": [{"type":"field_number","name":"DIST","value":50,"min":20,"max":500}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#2196F3",
-        "tooltip": "Move upward by specified distance"
-      },
-      { 
-        "type": "down", 
-        "message0": "⬇️ Move Down %1 cm", 
-        "args0": [{"type":"field_number","name":"DIST","value":50,"min":20,"max":500}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#2196F3",
-        "tooltip": "Move downward by specified distance"
-      },
-      { 
-        "type": "forward", 
-        "message0": "⏩ Move Forward %1 cm", 
-        "args0": [{"type":"field_number","name":"DIST","value":100,"min":20,"max":500}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#2196F3",
-        "tooltip": "Move forward by specified distance"
-      },
-      { 
-        "type": "back", 
-        "message0": "⏪ Move Back %1 cm", 
-        "args0": [{"type":"field_number","name":"DIST","value":100,"min":20,"max":500}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#2196F3",
-        "tooltip": "Move backward by specified distance"
-      },
-      { 
-        "type": "left", 
-        "message0": "⬅️ Move Left %1 cm", 
-        "args0": [{"type":"field_number","name":"DIST","value":100,"min":20,"max":500}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#2196F3",
-        "tooltip": "Move left by specified distance"
-      },
-      { 
-        "type": "right", 
-        "message0": "➡️ Move Right %1 cm", 
-        "args0": [{"type":"field_number","name":"DIST","value":100,"min":20,"max":500}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#2196F3",
-        "tooltip": "Move right by specified distance"
-      },
-      { 
-        "type": "rotate_cw", 
-        "message0": "↻ Rotate Clockwise %1°", 
-        "args0": [{"type":"field_number","name":"ANGLE","value":90,"min":1,"max":360}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#FF9800",
-        "tooltip": "Rotate clockwise by specified angle"
-      },
-      { 
-        "type": "rotate_ccw", 
-        "message0": "↺ Rotate Counter-Clockwise %1°", 
-        "args0": [{"type":"field_number","name":"ANGLE","value":90,"min":1,"max":360}], 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#FF9800",
-        "tooltip": "Rotate counter-clockwise by specified angle"
-      },
-      { 
-        "type": "flip_front", 
-        "message0": "🤸 Flip Forward", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#FF9800",
-        "tooltip": "Do a forward flip!"
-      },
-      { 
-        "type": "flip_back", 
-        "message0": "🤸 Flip Backward", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#FF9800"
-      },
-      { 
-        "type": "flip_left", 
-        "message0": "🤸 Flip Left", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#FF9800"
-      },
-      { 
-        "type": "flip_right", 
-        "message0": "🤸 Flip Right", 
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#FF9800"
-      },
-      { 
-        "type": "wait_seconds", 
-        "message0": "⏱️ Wait %1 seconds",
-        "args0": [{"type":"field_number","name":"SEC","value":1,"min":0.1,"max":60,"precision":0.1}],
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#9C27B0",
-        "tooltip": "Pause program for specified seconds"
-      },
-      { 
-        "type": "led_color", 
-        "message0": "💡 LED Color %1",
-        "args0": [{"type":"field_dropdown","name":"COLOR","options":[
-          ["🔴 Red","red"],
-          ["🟢 Green","green"],
-          ["🔵 Blue","blue"],
-          ["🟡 Yellow","yellow"],
-          ["⚪ White","white"],
-          ["🔷 Cyan","cyan"],
-          ["🟣 Magenta","magenta"]
-        ]}],
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#E91E63",
-        "tooltip": "Set LED to preset color"
-      },
-      { 
-        "type": "led_rgb", 
-        "message0": "🌈 LED RGB R%1 G%2 B%3",
-        "args0": [
-          {"type":"field_number","name":"R","value":255,"min":0,"max":255},
-          {"type":"field_number","name":"G","value":0,"min":0,"max":255},
-          {"type":"field_number","name":"B","value":0,"min":0,"max":255}
-        ],
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#E91E63",
-        "tooltip": "Set custom RGB color (0-255 for each)"
-      },
-      { 
-        "type": "led_breathe", 
-        "message0": "✨ LED Breathe R%1 G%2 B%3 Speed%4",
-        "args0": [
-          {"type":"field_number","name":"R","value":0,"min":0,"max":255},
-          {"type":"field_number","name":"G","value":255,"min":0,"max":255},
-          {"type":"field_number","name":"B","value":0,"min":0,"max":255},
-          {"type":"field_number","name":"SP","value":2,"min":1,"max":10}
-        ],
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#E91E63",
-        "tooltip": "LED breathing effect"
-      },
-      { 
-        "type": "led_flash", 
-        "message0": "⚡ LED Flash R%1 G%2 B%3 Speed%4",
-        "args0": [
-          {"type":"field_number","name":"R","value":255,"min":0,"max":255},
-          {"type":"field_number","name":"G","value":255,"min":0,"max":255},
-          {"type":"field_number","name":"B","value":0,"min":0,"max":255},
-          {"type":"field_number","name":"SP","value":5,"min":1,"max":10}
-        ],
-        "previousStatement": null, 
-        "nextStatement": null, 
-        "colour": "#E91E63",
-        "tooltip": "LED flashing effect"
-      },
-      { 
-        "type": "battery_level", 
-        "message0": "🔋 Battery Level", 
-        "output":"Number", 
-        "colour": "#607D8B",
-        "tooltip": "Returns battery percentage (0-100)"
-      },
-      { 
-        "type": "altitude", 
-        "message0": "📏 Altitude (cm)", 
-        "output":"Number", 
-        "colour": "#607D8B",
-        "tooltip": "Returns current height in centimeters"
-      }
-    ]);
-
-    // Python code generators
-    python.pythonGenerator.forBlock['takeoff'] = () => 'filo.takeoff()\n';
-    python.pythonGenerator.forBlock['land'] = () => 'filo.land()\n';
-    python.pythonGenerator.forBlock['stop'] = () => 'filo.stop()\n';
-    python.pythonGenerator.forBlock['emergency'] = () => 'filo.emergency()\n';
-    python.pythonGenerator.forBlock['up'] = (block) => `filo.move_up(${block.getFieldValue('DIST')})\n`;
-    python.pythonGenerator.forBlock['down'] = (block) => `filo.move_down(${block.getFieldValue('DIST')})\n`;
-    python.pythonGenerator.forBlock['forward'] = (block) => `filo.move_forward(${block.getFieldValue('DIST')})\n`;
-    python.pythonGenerator.forBlock['back'] = (block) => `filo.move_back(${block.getFieldValue('DIST')})\n`;
-    python.pythonGenerator.forBlock['left'] = (block) => `filo.move_left(${block.getFieldValue('DIST')})\n`;
-    python.pythonGenerator.forBlock['right'] = (block) => `filo.move_right(${block.getFieldValue('DIST')})\n`;
-    python.pythonGenerator.forBlock['rotate_cw'] = (block) => `filo.rotate_clockwise(${block.getFieldValue('ANGLE')})\n`;
-    python.pythonGenerator.forBlock['rotate_ccw'] = (block) => `filo.rotate_counter_clockwise(${block.getFieldValue('ANGLE')})\n`;
-    python.pythonGenerator.forBlock['flip_front'] = () => 'filo.flip("f")\n';
-    python.pythonGenerator.forBlock['flip_back'] = () => 'filo.flip("b")\n';
-    python.pythonGenerator.forBlock['flip_left'] = () => 'filo.flip("l")\n';
-    python.pythonGenerator.forBlock['flip_right'] = () => 'filo.flip("r")\n';
-    python.pythonGenerator.forBlock['wait_seconds'] = (block) => {
-      python.pythonGenerator.definitions_['import_time'] = 'import time';
-      return `time.sleep(${block.getFieldValue('SEC')})\n`;
-    };
-    python.pythonGenerator.forBlock['led_color'] = (block) => `filo.led_set_color("${block.getFieldValue('COLOR')}")\n`;
-    python.pythonGenerator.forBlock['led_rgb'] = (block) => `filo.led_set_rgb(${block.getFieldValue('R')}, ${block.getFieldValue('G')}, ${block.getFieldValue('B')})\n`;
-    python.pythonGenerator.forBlock['led_breathe'] = (block) => `filo.led_breathe(${block.getFieldValue('R')}, ${block.getFieldValue('G')}, ${block.getFieldValue('B')}, ${block.getFieldValue('SP')})\n`;
-    python.pythonGenerator.forBlock['led_flash'] = (block) => `filo.led_flash(${block.getFieldValue('R')}, ${block.getFieldValue('G')}, ${block.getFieldValue('B')}, ${block.getFieldValue('SP')})\n`;
-    python.pythonGenerator.forBlock['battery_level'] = () => ['filo.get_battery()', python.pythonGenerator.ORDER_ATOMIC];
-    python.pythonGenerator.forBlock['altitude'] = () => ['filo.get_height()', python.pythonGenerator.ORDER_ATOMIC];
-
-    // Initialize Blockly workspace
-    var workspace = Blockly.inject('blocklyDiv', {
-      toolbox: document.getElementById('toolbox'),
-      grid: {spacing: 25, length: 3, colour: '#e0e0e0', snap: true},
-      zoom: {
-        controls: true, 
-        wheel: true, 
-        startScale: 0.9,
-        maxScale: 1.5,
-        minScale: 0.5
-      },
-      trashcan: true,
-      sounds: true,
-      media: 'https://unpkg.com/blockly/media/'
-    });
-
-    // Initialize CodeMirror
-    var editor = CodeMirror.fromTextArea(document.getElementById("codeEditor"), {
-      mode: "python",
-      theme: "monokai",
-      lineNumbers: true,
-      indentUnit: 4,
-      tabSize: 4,
-      autofocus: false,
-      lineWrapping: true
-    });
-
-    // Track workspace changes
-    workspace.addChangeListener(() => {
-      const blockCount = workspace.getAllBlocks(false).length;
-      document.getElementById('blockCount').textContent = blockCount;
-      
-      const code = python.pythonGenerator.workspaceToCode(workspace);
-      const lineCount = code.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).length;
-      document.getElementById('lineCount').textContent = lineCount;
-    });
-
-    // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        const tab = btn.dataset.tab;
-        document.getElementById('codeTab').classList.toggle('hidden', tab !== 'code');
-        document.getElementById('consoleTab').classList.toggle('hidden', tab !== 'console');
-      });
-    });
-
-    // Generate code button
-    document.getElementById('generateBtn').addEventListener('click', () => {
-      try {
-        const code = python.pythonGenerator.workspaceToCode(workspace);
-        editor.setValue(code);
-        logConsole("✅ Python code generated!", 'success');
-        showNotification("Code Generated!", "success");
-      } catch (error) {
-        logConsole(`❌ Error: ${error.message}`, 'error');
-        showNotification("Generation Failed", "error");
-      }
-    });
-
-    // Load blocks from Python
-    document.getElementById('loadBlocks').addEventListener('click', () => {
-      const code = editor.getValue().trim();
-      if (!code) {
-        showNotification("No code to load!", "warning");
-        return;
-      }
-      
-      try {
-        const parser = new PythonToBlocklyParser(workspace);
-        const blocks = parser.parse(code);
-        
-        if (blocks.length > 0) {
-          logConsole(`✅ Loaded ${blocks.length} blocks`, 'success');
-          showNotification(`${blocks.length} Blocks Loaded!`, "success");
-          workspace.scrollCenter();
-        } else {
-          showNotification("No valid blocks found", "warning");
-        }
-      } catch (error) {
-        logConsole(`❌ Parse error: ${error.message}`, 'error');
-        showNotification("Parse Failed", "error");
-      }
-    });
-
-    // Clear workspace
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      if (confirm('🗑️ Clear all blocks? This cannot be undone!')) {
-        workspace.clear();
-        logConsole("🗑️ Workspace cleared", 'info');
-        showNotification("Workspace Cleared", "info");
-      }
-    });
-
-    // Save workspace
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      const xml = Blockly.Xml.workspaceToDom(workspace);
-      const xmlText = Blockly.Xml.domToText(xml);
-      localStorage.setItem('drone_workspace', xmlText);
-      logConsole("💾 Workspace saved!", 'success');
-      showNotification("Saved Successfully!", "success");
-    });
-
-    // Center workspace
-    document.getElementById('centerBtn').addEventListener('click', () => {
-      workspace.scrollCenter();
-      showNotification("Workspace Centered", "info");
-    });
-
-    // Clear console
-    document.getElementById('clearConsole').addEventListener('click', () => {
-      document.getElementById('console').innerHTML = '';
-      logConsole("Console cleared", 'info');
-    });
-
-    // Tutorial button
-    document.getElementById('tutorialBtn').addEventListener('click', () => {
-      showTutorial();
-    });
-
-    // Examples button
-    document.getElementById('examplesBtn').addEventListener('click', () => {
-      showExamples();
-    });
-
-    // Helper functions
-    function logConsole(message, type = 'info') {
-      const consoleEl = document.getElementById('console');
-      const timestamp = new Date().toLocaleTimeString();
-      const icons = {
-        info: '💬',
-        error: '❌',
-        warning: '⚠️',
-        success: '✅'
-      };
-      const colors = {
-        info: 'text-cyan-400',
-        error: 'text-red-400',
-        warning: 'text-yellow-400',
-        success: 'text-green-400'
-      };
-      consoleEl.innerHTML += `<div class="${colors[type]} mb-1"><span class="text-white/50">[${timestamp}]</span> ${icons[type]} ${message}</div>`;
-      consoleEl.scrollTop = consoleEl.scrollHeight;
-    }
-
-    function showNotification(message, type) {
-      const colors = {
-        success: 'bg-green-500',
-        error: 'bg-red-500',
-        warning: 'bg-yellow-500',
-        info: 'bg-blue-500'
-      };
-      
-      const notif = document.createElement('div');
-      notif.className = `fixed top-24 right-6 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-2xl z-50 font-semibold animate-bounce`;
-      notif.textContent = message;
-      document.body.appendChild(notif);
-      
-      setTimeout(() => {
-        notif.style.animation = 'none';
-        notif.style.opacity = '0';
-        notif.style.transition = 'opacity 0.5s';
-        setTimeout(() => notif.remove(), 500);
-      }, 2000);
-    }
-
-    function updateStatus(status, text) {
-      const indicator = document.querySelector('.status-indicator');
-      const statusText = document.getElementById('statusText');
-      const stopBtn = document.getElementById('stopBtn');
-      
-      indicator.className = 'status-indicator status-' + status;
-      statusText.textContent = text;
-      
-      stopBtn.classList.toggle('hidden', status !== 'executing');
-    }
-
-    function showTutorial() {
-      const tutorial = `
-🎓 DRONE PROGRAMMING TUTORIAL
-
-Step 1: Basic Flight
-- Drag "🚁 Takeoff" block to start
-- Add "⏱️ Wait 2 seconds" 
-- Add "🛬 Land" to finish
-
-Step 2: Movement
-- Try moving forward, backward, left, right
-- Each movement takes a distance in cm
-
-Step 3: Loops
-- Use "Repeat" blocks to do things multiple times
-- Great for patterns like squares or circles!
-
-Step 4: LED Effects
-- Make your drone colorful!
-- Try different colors and effects
-
-🎯 Try the examples for inspiration!
-      `.trim();
-      
-      alert(tutorial);
-    }
-
-    function showExamples() {
-      const examples = {
-        "Square Pattern": `filo.takeoff()
-time.sleep(2)
-
-for i in range(4):
-    filo.led_set_color("green")
-    filo.move_forward(100)
-    filo.rotate_clockwise(90)
-    time.sleep(0.5)
-
-filo.land()`,
-        
-        "LED Light Show": `filo.takeoff()
-time.sleep(2)
-
-filo.led_set_color("red")
-time.sleep(1)
-filo.led_set_color("green")
-time.sleep(1)
-filo.led_set_color("blue")
-time.sleep(1)
-
-filo.land()`,
-        
-        "Circle Dance": `filo.takeoff()
-time.sleep(2)
-
-for i in range(12):
-    filo.move_forward(50)
-    filo.rotate_clockwise(30)
-    time.sleep(0.3)
-
-filo.land()`
-      };
-      
-      const choice = prompt(`Choose an example:
-1. Square Pattern
-2. LED Light Show  
-3. Circle Dance
-
-Enter 1, 2, or 3:`);
-      
-      const exampleKeys = Object.keys(examples);
-      if (choice >= 1 && choice <= 3) {
-        editor.setValue(examples[exampleKeys[choice - 1]]);
-        showNotification(`Example "${exampleKeys[choice - 1]}" Loaded!`, "success");
-      }
-    }
-
-    // Mission execution
-    document.getElementById('startBtn').addEventListener('click', () => {
-      const hasBlocks = workspace.getAllBlocks(false).length > 0;
-      const manualCode = editor.getValue().trim();
-      
-      let programToSend = '';
-      
-      if (hasBlocks) {
-        programToSend = python.pythonGenerator.workspaceToCode(workspace);
-        logConsole("🚀 Launching mission from blocks...", 'info');
-      } else if (manualCode) {
-        programToSend = manualCode;
-        logConsole("🚀 Launching mission from code...", 'info');
-      } else {
-        showNotification("Build a program first!", "warning");
-        return;
-      }
-      
-      updateStatus('executing', '🚀 Mission Active');
-      
-      const serverUrl = window.location.hostname === 'localhost' 
-        ? 'http://127.0.0.1:5000' 
-        : `http://${window.location.hostname}:5000`;
-      
-      fetch(`${serverUrl}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: programToSend })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === 'success') {
-          logConsole(`✅ Mission started! ${data.commands} commands`, 'success');
-          showNotification("Mission Started!", "success");
-          checkProgramStatus();
-        } else {
-          logConsole(`❌ ${data.message}`, 'error');
-          updateStatus('connected', 'Ready');
-          showNotification("Mission Failed", "error");
-        }
-      })
-      .catch(err => {
-        logConsole(`❌ Connection error: ${err.message}`, 'error');
-        updateStatus('disconnected', 'Connection Failed');
-        showNotification("Connection Error", "error");
-      });
-    });
-
-    // Stop mission
-    document.getElementById('stopBtn').addEventListener('click', () => {
-      const serverUrl = window.location.hostname === 'localhost' 
-        ? 'http://127.0.0.1:5000' 
-        : `http://${window.location.hostname}:5000`;
-      
-      fetch(`${serverUrl}/stop_program`, { method: "POST" })
-        .then(() => {
-          logConsole('🛑 Mission aborted!', 'warning');
-          updateStatus('connected', 'Ready');
-          showNotification("Mission Stopped", "warning");
-        });
-    });
-
-    function checkProgramStatus() {
-      const serverUrl = window.location.hostname === 'localhost' 
-        ? 'http://127.0.0.1:5000' 
-        : `http://${window.location.hostname}:5000`;
-      
-      const interval = setInterval(() => {
-        fetch(`${serverUrl}/status`)
-          .then(res => res.json())
-          .then(data => {
-            if (!data.autonomous) {
-              clearInterval(interval);
-              logConsole('🎉 Mission completed!', 'success');
-              updateStatus('connected', 'Ready');
-              showNotification("Mission Complete!", "success");
-              
-              // Increment mission counter
-              const count = parseInt(document.getElementById('missionCount').textContent) + 1;
-              document.getElementById('missionCount').textContent = count;
-              
-              // Award achievements
-              if (count === 1) unlockAchievement('🚀 First Flight');
-              if (count === 5) unlockAchievement('🔄 Loop Master');
-              if (count === 10) unlockAchievement('🎨 LED Artist');
-            }
-          })
-          .catch(() => {
-            clearInterval(interval);
-            updateStatus('disconnected', 'Connection Lost');
-          });
-      }, 1000);
-    }
-
-    function unlockAchievement(name) {
-      const achievementsEl = document.getElementById('achievements');
-      const badge = document.createElement('div');
-      badge.className = 'badge bg-gradient-to-r from-yellow-400 to-orange-500 text-white';
-      badge.textContent = name;
-      achievementsEl.appendChild(badge);
-      
-      showNotification(`🏆 Achievement Unlocked: ${name}`, "success");
-    }
-
-    // Python to Blockly Parser
-    class PythonToBlocklyParser {
-      constructor(workspace) {
-        this.workspace = workspace;
-        this.blockStack = [];
-      }
-
-      getIndent(line) {
-        const match = line.match(/^(\s*)/);
-        return match ? match[1].length : 0;
-      }
-
-      parse(code) {
-        this.workspace.clear();
-        this.blockStack = [];
-        
-        const lines = code.split('\n');
-        const blocks = [];
-        let lastBlock = null;
-        let lastIndent = 0;
-
-        lines.forEach((line, i) => {
-          if (!line.trim() || line.trim().startsWith('#') || line.trim().startsWith('import')) {
-            return;
-          }
-
-          const currentIndent = this.getIndent(line);
-          const block = this.parseLine(line.trim());
-          
-          if (!block) return;
-
-          block.initSvg();
-          block.render();
-
-          if (currentIndent > lastIndent && this.blockStack.length > 0) {
-            const parent = this.blockStack[this.blockStack.length - 1];
-            const doInput = parent.block.getInput('DO') || parent.block.getInput('DO0');
-            
-            if (doInput && doInput.connection) {
-              doInput.connection.connect(block.previousConnection);
-              lastBlock = block;
-            }
-          } else if (currentIndent < lastIndent) {
-            while (this.blockStack.length > 0 && this.blockStack[this.blockStack.length - 1].indent >= currentIndent) {
-              this.blockStack.pop();
-            }
-            
-            if (lastBlock && lastBlock.nextConnection && block.previousConnection) {
-              lastBlock.nextConnection.connect(block.previousConnection);
-            }
-            lastBlock = block;
-          } else {
-            if (lastBlock && lastBlock.nextConnection && block.previousConnection) {
-              lastBlock.nextConnection.connect(block.previousConnection);
-            } else {
-              block.moveBy(50, 50 + blocks.length * 10);
-            }
-            lastBlock = block;
-          }
-
-          blocks.push(block);
-          lastIndent = currentIndent;
-        });
-
-        return blocks;
-      }
-
-      parseLine(line) {
-        let block = null;
-
-        // Control flow
-        if (line.startsWith('for ') && 'range(' in line) {
-          block = this.workspace.newBlock('controls_repeat_ext');
-          const match = line.match(/range\((\d+)\)/);
-          if (match) {
-            const numBlock = this.workspace.newBlock('math_number');
-            numBlock.setFieldValue(match[1], 'NUM');
-            numBlock.initSvg();
-            numBlock.render();
-            block.getInput('TIMES').connection.connect(numBlock.outputConnection);
-          }
-          this.blockStack.push({block, indent: 0});
-          return block;
-        }
-
-        // Drone commands
-        if (line === 'filo.takeoff()') block = this.workspace.newBlock('takeoff');
-        else if (line === 'filo.land()') block = this.workspace.newBlock('land');
-        else if (line === 'filo.stop()') block = this.workspace.newBlock('stop');
-        else if (line === 'filo.emergency()') block = this.workspace.newBlock('emergency');
-        else if (line.match(/filo\.move_up\((\d+)\)/)) {
-          block = this.workspace.newBlock('up');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'DIST');
-        }
-        else if (line.match(/filo\.move_down\((\d+)\)/)) {
-          block = this.workspace.newBlock('down');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'DIST');
-        }
-        else if (line.match(/filo\.move_forward\((\d+)\)/)) {
-          block = this.workspace.newBlock('forward');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'DIST');
-        }
-        else if (line.match(/filo\.move_back\((\d+)\)/)) {
-          block = this.workspace.newBlock('back');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'DIST');
-        }
-        else if (line.match(/filo\.move_left\((\d+)\)/)) {
-          block = this.workspace.newBlock('left');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'DIST');
-        }
-        else if (line.match(/filo\.move_right\((\d+)\)/)) {
-          block = this.workspace.newBlock('right');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'DIST');
-        }
-        else if (line.match(/filo\.rotate_clockwise\((\d+)\)/)) {
-          block = this.workspace.newBlock('rotate_cw');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'ANGLE');
-        }
-        else if (line.match(/filo\.rotate_counter_clockwise\((\d+)\)/)) {
-          block = this.workspace.newBlock('rotate_ccw');
-          block.setFieldValue(line.match(/\((\d+)\)/)[1], 'ANGLE');
-        }
-        else if (line.match(/filo\.flip\(["']([fbrl])["']\)/)) {
-          const dir = line.match(/["']([fbrl])["']/)[1];
-          const types = {f: 'flip_front', b: 'flip_back', l: 'flip_left', r: 'flip_right'};
-          block = this.workspace.newBlock(types[dir]);
-        }
-        else if (line.match(/time\.sleep\((\d+(?:\.\d+)?)\)/)) {
-          block = this.workspace.newBlock('wait_seconds');
-          block.setFieldValue(line.match(/\((\d+(?:\.\d+)?)\)/)[1], 'SEC');
-        }
-        else if (line.match(/filo\.led_set_color\(["'](\w+)["']\)/)) {
-          block = this.workspace.newBlock('led_color');
-          block.setFieldValue(line.match(/["'](\w+)["']/)[1], 'COLOR');
-        }
-        else if (line.match(/filo\.led_set_rgb\((\d+),\s*(\d+),\s*(\d+)\)/)) {
-          block = this.workspace.newBlock('led_rgb');
-          const match = line.match(/\((\d+),\s*(\d+),\s*(\d+)\)/);
-          block.setFieldValue(match[1], 'R');
-          block.setFieldValue(match[2], 'G');
-          block.setFieldValue(match[3], 'B');
-        }
-
-        return block;
-      }
-    }
-
-    // Initial connection check
-    setTimeout(() => {
-      const serverUrl = window.location.hostname === 'localhost' 
-        ? 'http://127.0.0.1:5000' 
-        : `http://${window.location.hostname}:5000`;
-      
-      fetch(`${serverUrl}/status`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.connection === 'connected') {
-            updateStatus('connected', '✅ Ready to Fly');
-            logConsole('✅ Connected to drone!', 'success');
-            showNotification("Drone Connected!", "success");
-          }
-        })
-        .catch(() => {
-          updateStatus('disconnected', '❌ Server Offline');
-          logConsole('⚠️ Server not reachable', 'warning');
-        });
-    }, 500);
-
-    // Load saved workspace
-    window.addEventListener('load', () => {
-      try {
-        const savedXml = localStorage.getItem('drone_workspace');
-        if (savedXml) {
-          const xml = Blockly.utils.xml.textToDom(savedXml);
-          Blockly.Xml.domToWorkspace(xml, workspace);
-          logConsole('📂 Previous workspace restored', 'info');
-        }
-      } catch (e) {
-        console.warn('Failed to load workspace:', e);
-      }
-    });
-
-    // Auto-save every 30 seconds
-    setInterval(() => {
-      const xml = Blockly.Xml.workspaceToDom(workspace);
-      const xmlText = Blockly.Xml.domToText(xml);
-      localStorage.setItem('drone_workspace', xmlText);
-    }, 30000);
-
-    // Welcome message
-    setTimeout(() => {
-      logConsole('👋 Welcome to Robotix Drone Academy!', 'info');
-      logConsole('💡 Drag blocks from the left to start coding', 'info');
-      logConsole('🎯 Try the Tutorial or Examples for ideas', 'info');
-    }, 1000);
-  </script>
 </body>
 </html>
