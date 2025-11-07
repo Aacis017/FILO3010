@@ -2,7 +2,7 @@ from flask import Flask, Response, render_template, request, jsonify
 import io, os, json, time, threading, serial, platform
 import re
 
-app = Flask(__name__, static_url_path='/static', static_folder='static')
+app = Flask(__name__)
 armed = False
 autonomous_mode = False  # Flag for autonomous flight
 
