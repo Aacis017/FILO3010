@@ -1,6 +1,4 @@
 //main.js
-
-
 // initialize Blockly workspace
 var workspace = Blockly.inject('blocklyDiv', {
   toolbox: document.getElementById('toolbox'),
@@ -8,9 +6,6 @@ var workspace = Blockly.inject('blocklyDiv', {
   zoom: {controls: true, wheel: true, startScale: 0.9},
  
 });
-
-
-
 
 // Initialize CodeMirror
 var editor = CodeMirror.fromTextArea(document.getElementById("codeEditor"), {
