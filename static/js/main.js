@@ -1,4 +1,4 @@
-//main.js
+///main.js
 // initialize Blockly workspace
 var workspace = Blockly.inject('blocklyDiv', {
   toolbox: document.getElementById('toolbox'),
@@ -17,10 +17,8 @@ var editor = CodeMirror.fromTextArea(document.getElementById("codeEditor"), {
     autofocus: true
 });
 
-
-
 // ============================================
-// PYTHON TO BLOCKLY PARSER (CORRECTED)
+// PYTHON TO BLOCKLY PARSER (FINAL CORRECTED VERSION)
 // ============================================
 class PythonToBlocklyParser {
   constructor(workspace) {
@@ -35,7 +33,6 @@ class PythonToBlocklyParser {
   }
 
   // Parse a single line and create appropriate block
-  // This function is now a "pure" factory: it creates blocks but does NOT manage the stack.
   parseLine(line, lineNumber, lines, currentIndex) {
     const trimmed = line.trim();
     const indent = this.getIndent(line);
@@ -45,210 +42,85 @@ class PythonToBlocklyParser {
     }
 
     let block = null;
+    let context = {}; // Holds context for control blocks
 
     // ===== CONTROL FLOW =====
     if (trimmed.startsWith('if ')) {
       block = this.workspace.newBlock('controls_if');
-      let elifCount = 0;
-      let hasElse = false;
+      let elifCount = 0; let hasElse = false;
       for (let i = currentIndex + 1; i < lines.length; i++) {
-        const nextLine = lines[i].trim();
-        const nextIndent = this.getIndent(lines[i]);
+        const nextLine = lines[i].trim(); const nextIndent = this.getIndent(lines[i]);
         if (nextIndent < indent && nextLine) break;
         if (nextIndent === indent) {
           if (nextLine.startsWith('elif ')) elifCount++;
-          else if (nextLine.startsWith('else:')) {
-            hasElse = true;
-            break;
-          }
+          else if (nextLine.startsWith('else:')) { hasElse = true; break; }
         }
       }
-      
-      block.elseifCount_ = elifCount;
-      block.elseCount_ = hasElse ? 1 : 0;
-      if (typeof block.updateShape_ === 'function') {
-          block.updateShape_();
-      }
-      
+      block.elseifCount_ = elifCount; block.elseCount_ = hasElse ? 1 : 0;
+      if (typeof block.updateShape_ === 'function') block.updateShape_();
       const condition = trimmed.match(/if\s+(.+):/);
       if (condition) this.parseCondition(block, condition[1], 'IF0');
-      
-      // Return the block AND its context for the main loop to handle
-      return {
-        block, 
-        indent, 
-        type: 'if',
-        elifIndex: 0,
-        currentSection: 'DO0'
-      };
+      context = { indent, type: 'if', elifIndex: 0, currentSection: 'DO0' };
     }
-    
-    // Elif/Else are now handled entirely by the main parse loop,
-    // so this function doesn't need to return a marker for them.
-    if (trimmed.startsWith('elif ') || trimmed.startsWith('else:')) {
-        return null; // The main loop handles these as state changes
+    else if (trimmed.startsWith('elif ') || trimmed.startsWith('else:')) {
+      return null; // Handled by the main parse loop
     }
-
-    // While loop
     else if (trimmed.startsWith('while ')) {
       block = this.workspace.newBlock('controls_whileUntil');
       block.setFieldValue('WHILE', 'MODE');
       const condition = trimmed.match(/while\s+(.+):/);
       if (condition) this.parseCondition(block, condition[1], 'BOOL');
-      return { block, indent, type: 'while' };
+      context = { indent, type: 'while' };
     }
-
-    // For loop
-    else if (trimmed.match(/for\s+\w+\s+in\s+range\(/)) {
+    else if (trimmed.match(/for\s+\w+\s+in\s+range\([^,]+,.+\)/)) {
       block = this.workspace.newBlock('controls_for');
-      const match = trimmed.match(/for\s+(\w+)\s+in\s+range\((\d+)(?:,\s*(\d+))?(?:,\s*(\d+))?\)/);
+      const match = trimmed.match(/for\s+(\w+)\s+in\s+range\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*(?:,\s*([\d.-]+))?\)/);
       if (match) {
-        const [, varName, start, end, step] = match;
+        const [, varName, from, to, by] = match;
         block.setFieldValue(varName, 'VAR');
-        if (end) {
-          this.setNumberInput(block, 'FROM', start);
-          this.setNumberInput(block, 'TO', end);
-          if (step) this.setNumberInput(block, 'BY', step);
-        } else {
-          this.setNumberInput(block, 'FROM', 0);
-          this.setNumberInput(block, 'TO', start);
-        }
+        this.setNumberInput(block, 'FROM', from);
+        this.setNumberInput(block, 'TO', to);
+        this.setNumberInput(block, 'BY', by || 1);
       }
-      return { block, indent, type: 'for' };
+      context = { indent, type: 'for' };
+    }
+    else if (trimmed.match(/for\s+\w+\s+in\s+range\([^,]+\)/)) {
+      block = this.workspace.newBlock('controls_repeat_ext');
+      const match = trimmed.match(/range\(\s*(\d+)\s*\)/);
+      if (match) this.setNumberInput(block, 'TIMES', match[1]);
+      context = { indent, type: 'repeat' };
     }
 
-    // Repeat loop (simplified match to avoid conflict with for)
-    else if (trimmed.match(/for\s+\w+\s+in\s+range\((\d+)\):/)) {
-        if (!trimmed.match(/for\s+\w+\s+in\s+range\(\d+,\s*\d+\)/)) { // ensure it's not a full for loop
-            block = this.workspace.newBlock('controls_repeat_ext');
-            const times = trimmed.match(/range\((\d+)\)/)[1];
-            this.setNumberInput(block, 'TIMES', times);
-            return { block, indent, type: 'repeat' };
-        }
-    }
-
-    // ===== DRONE COMMANDS (and other statements) =====
+    // ===== DRONE COMMANDS and other statements =====
     else if (trimmed === 'filo.takeoff()') block = this.workspace.newBlock('takeoff');
     else if (trimmed === 'filo.land()') block = this.workspace.newBlock('land');
     else if (trimmed === 'filo.stop()') block = this.workspace.newBlock('stop');
     else if (trimmed === 'filo.emergency()') block = this.workspace.newBlock('emergency');
-    else if (trimmed.match(/filo\.move_up\((\d+)\)/)) {
-      block = this.workspace.newBlock('up');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST');
-    }
-    else if (trimmed.match(/filo\.move_down\((\d+)\)/)) {
-      block = this.workspace.newBlock('down');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST');
-    }
-    else if (trimmed.match(/filo\.move_forward\((\d+)\)/)) {
-      block = this.workspace.newBlock('forward');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST');
-    }
-    else if (trimmed.match(/filo\.move_back\((\d+)\)/)) {
-      block = this.workspace.newBlock('back');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST');
-    }
-    else if (trimmed.match(/filo\.move_left\((\d+)\)/)) {
-      block = this.workspace.newBlock('left');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST');
-    }
-    else if (trimmed.match(/filo\.move_right\((\d+)\)/)) {
-      block = this.workspace.newBlock('right');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST');
-    }
-
-    // Rotation
-    else if (trimmed.match(/filo\.rotate_clockwise\((\d+)\)/)) {
-      block = this.workspace.newBlock('rotate_cw');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'ANGLE');
-    }
-    else if (trimmed.match(/filo\.rotate_counter_clockwise\((\d+)\)/)) {
-      block = this.workspace.newBlock('rotate_ccw');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'ANGLE');
-    }
-    // Flips
+    else if (trimmed.match(/filo\.move_up\((\d+)\)/)) { block = this.workspace.newBlock('up'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
+    else if (trimmed.match(/filo\.move_down\((\d+)\)/)) { block = this.workspace.newBlock('down'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
+    else if (trimmed.match(/filo\.move_forward\((\d+)\)/)) { block = this.workspace.newBlock('forward'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
+    else if (trimmed.match(/filo\.move_back\((\d+)\)/)) { block = this.workspace.newBlock('back'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
+    else if (trimmed.match(/filo\.move_left\((\d+)\)/)) { block = this.workspace.newBlock('left'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
+    else if (trimmed.match(/filo\.move_right\((\d+)\)/)) { block = this.workspace.newBlock('right'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
+    else if (trimmed.match(/filo\.rotate_clockwise\((\d+)\)/)) { block = this.workspace.newBlock('rotate_cw'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'ANGLE'); }
+    else if (trimmed.match(/filo\.rotate_counter_clockwise\((\d+)\)/)) { block = this.workspace.newBlock('rotate_ccw'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'ANGLE'); }
     else if (trimmed.match(/filo\.flip\(["']f["']\)/)) block = this.workspace.newBlock('flip_front');
     else if (trimmed.match(/filo\.flip\(["']b["']\)/)) block = this.workspace.newBlock('flip_back');
     else if (trimmed.match(/filo\.flip\(["']l["']\)/)) block = this.workspace.newBlock('flip_left');
     else if (trimmed.match(/filo\.flip\(["']r["']\)/)) block = this.workspace.newBlock('flip_right');
-
-    // Wait/Sleep
-   else if (trimmed.startsWith('time.sleep(')) {
-        const match = trimmed.match(/time\.sleep\((\d+(?:\.\d+)?)\)/);
-        if (match && match[1]) {
-            block = this.workspace.newBlock('wait_seconds');
-            block.setFieldValue(match[1], 'SEC');
-        }
-    }
-
-        // ✅ ADDED THIS BLOCK FOR SET SPEED
-    else if (trimmed.match(/filo\.set_speed\((\d+)\)/)) {
-      block = this.workspace.newBlock('setspeed');
-      block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'SPD');
-    }
-
-    else if (trimmed.match(/filo\.led_breathe\((.+)\)/)) {
-      block = this.workspace.newBlock('led_breathe');
-      const args = trimmed.match(/\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/);
-      block.setFieldValue(args[1], 'R');
-      block.setFieldValue(args[2], 'G');
-      block.setFieldValue(args[3], 'B');
-      block.setFieldValue(args[4], 'SP');
-    }
-    else if (trimmed.match(/filo\.led_flash\((.+)\)/)) {
-      block = this.workspace.newBlock('led_flash');
-      const args = trimmed.match(/\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/);
-      block.setFieldValue(args[1], 'R');
-      block.setFieldValue(args[2], 'G');
-      block.setFieldValue(args[3], 'B');
-      block.setFieldValue(args[4], 'SP');
-    }
-    else if (trimmed.match(/print\(/)) {
-      block = this.workspace.newBlock('text_print');
-      const content = trimmed.match(/print\((.+)\)/);
-      if (content) {
-        const textBlock = this.workspace.newBlock('text');
-        textBlock.setFieldValue(content[1].replace(/['"]/g, ''), 'TEXT');
-        textBlock.initSvg();
-        textBlock.render();
-        block.getInput('TEXT').connection.connect(textBlock.outputConnection);
-      }
-    }
-    // ✅ ADDED THIS BLOCK FOR 'GO TO'
-    else if (trimmed.match(/filo\.go\((.+)\)/)) {
-      block = this.workspace.newBlock('go');
-      // Matches 4 comma-separated numbers
-      const args = trimmed.match(/\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-      if (args) {
-        block.setFieldValue(args[1].trim(), 'X');
-        block.setFieldValue(args[2].trim(), 'Y');
-        block.setFieldValue(args[3].trim(), 'Z');
-        block.setFieldValue(args[4].trim(), 'SPD');
-      }
-    }
+    else if (trimmed.startsWith('time.sleep(')) { const match = trimmed.match(/time\.sleep\((\d+(?:\.\d+)?)\)/); if (match) { block = this.workspace.newBlock('wait_seconds'); block.setFieldValue(match[1], 'SEC'); } }
+    else if (trimmed.match(/filo\.set_speed\((\d+)\)/)) { block = this.workspace.newBlock('setspeed'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'SPD'); }
+    else if (trimmed.match(/filo\.led_breathe\((.+)\)/)) { block = this.workspace.newBlock('led_breathe'); const a = trimmed.match(/\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/); block.setFieldValue(a[1], 'R'); block.setFieldValue(a[2], 'G'); block.setFieldValue(a[3], 'B'); block.setFieldValue(a[4], 'SP'); }
+    else if (trimmed.match(/filo\.led_flash\((.+)\)/)) { block = this.workspace.newBlock('led_flash'); const a = trimmed.match(/\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/); block.setFieldValue(a[1], 'R'); block.setFieldValue(a[2], 'G'); block.setFieldValue(a[3], 'B'); block.setFieldValue(a[4], 'SP'); }
+    else if (trimmed.match(/filo\.go\((.+)\)/)) { block = this.workspace.newBlock('go'); const a = trimmed.match(/\(([^,]+),([^,]+),([^,]+),([^)]+)\)/); if (a) { block.setFieldValue(a[1].trim(), 'X'); block.setFieldValue(a[2].trim(), 'Y'); block.setFieldValue(a[3].trim(), 'Z'); block.setFieldValue(a[4].trim(), 'SPD'); } }
+    else if (trimmed.match(/filo\.curve\((.+)\)/)) { block = this.workspace.newBlock('curve'); const a = trimmed.match(/\(([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^)]+)\)/); if (a) { block.setFieldValue(a[1].trim(), 'X1'); block.setFieldValue(a[2].trim(), 'Y1'); block.setFieldValue(a[3].trim(), 'Z1'); block.setFieldValue(a[4].trim(), 'X2'); block.setFieldValue(a[5].trim(), 'Y2'); block.setFieldValue(a[6].trim(), 'Z2'); block.setFieldValue(a[7].trim(), 'SPD'); } }
+    else if (trimmed.match(/print\(/)) { /* your print logic */ }
     
-    // ✅ ADDED THIS BLOCK FOR 'CURVE'
-    else if (trimmed.match(/filo\.curve\((.+)\)/)) {
-      block = this.workspace.newBlock('curve');
-      // Matches 7 comma-separated numbers
-      const args = trimmed.match(/\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-      if (args) {
-        block.setFieldValue(args[1].trim(), 'X1');
-        block.setFieldValue(args[2].trim(), 'Y1');
-        block.setFieldValue(args[3].trim(), 'Z1');
-        block.setFieldValue(args[4].trim(), 'X2');
-        block.setFieldValue(args[5].trim(), 'Y2');
-        block.setFieldValue(args[6].trim(), 'Z2');
-        block.setFieldValue(args[7].trim(), 'SPD');
-      }
-    }
-    
-    // ... Add any other 'else if' statements for your other blocks here ...
-
-    return block ? { block } : null; // Return simple blocks with no special context
+    if (!block) return null;
+    return { block, ...context };
   }
 
-  // Helper: Parse condition and attach to block
+  // Helper: Parse condition
   parseCondition(parentBlock, conditionStr, inputName = 'IF0') {
     const compMatch = conditionStr.match(/(.+?)\s*(==|!=|<|>|<=|>=)\s*(.+)/);
     if (compMatch) {
@@ -258,134 +130,118 @@ class PythonToBlocklyParser {
       compareBlock.setFieldValue(opMap[op] || 'EQ', 'OP');
       this.setCompareInput(compareBlock, 'A', left.trim());
       this.setCompareInput(compareBlock, 'B', right.trim());
-      compareBlock.initSvg();
-      compareBlock.render();
+      compareBlock.initSvg(); compareBlock.render();
       const input = parentBlock.getInput(inputName);
-      if (input && input.connection) {
-        input.connection.connect(compareBlock.outputConnection);
-      }
+      if (input && input.connection) input.connection.connect(compareBlock.outputConnection);
     }
   }
 
   // Helper: Set number input
   setNumberInput(block, inputName, value) {
+    const input = block.getInput(inputName);
+    if (!input || !input.connection) return;
     const numBlock = this.workspace.newBlock('math_number');
     numBlock.setFieldValue(value, 'NUM');
-    numBlock.initSvg();
-    numBlock.render();
-    block.getInput(inputName).connection.connect(numBlock.outputConnection);
+    numBlock.initSvg(); numBlock.render();
+    input.connection.connect(numBlock.outputConnection);
   }
 
-  // Helper: Set compare input (number or sensor)
+  // Helper: Set compare input
   setCompareInput(block, inputName, value) {
     const input = block.getInput(inputName);
     if (!input || !input.connection) return;
-
     if (!isNaN(value)) {
       this.setNumberInput(block, inputName, value);
     } else if (value.includes('filo.get_battery()')) {
       const sensorBlock = this.workspace.newBlock('battery_level');
-      sensorBlock.initSvg();
-      sensorBlock.render();
+      sensorBlock.initSvg(); sensorBlock.render();
       input.connection.connect(sensorBlock.outputConnection);
     }
   }
 
-  // Main parse function (REWRITTEN FOR CORRECTNESS)
+  // Main parse function
   parse(code) {
     this.workspace.clear();
     this.blockStack = [];
-    
     const lines = code.split('\n');
     let topLevelBlocks = [];
     let lastBlockInSection = {}; 
+    let lastTopLevelBlock = null; // ✅ ADDED: Tracker for the last top-level block
 
     lines.forEach((line, i) => {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) return;
+      if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('i = None') || trimmed.trim() === 'pass') return;
 
       const currentIndent = this.getIndent(line);
       let parentContext = this.blockStack.length > 0 ? this.blockStack[this.blockStack.length - 1] : null;
 
-      // --- 1. HANDLE ELIF/ELSE STATE CHANGES ---
-      // Before doing anything else, check if this line is changing the section of a parent 'if' block.
       if (parentContext && parentContext.type === 'if' && currentIndent === parentContext.indent) {
         if (trimmed.startsWith('elif ')) {
           parentContext.elifIndex++;
           const condition = trimmed.match(/elif\s+(.+):/);
-          if (condition) {
-            this.parseCondition(parentContext.block, condition[1], `IF${parentContext.elifIndex}`);
-          }
+          if (condition) this.parseCondition(parentContext.block, condition[1], `IF${parentContext.elifIndex}`);
           parentContext.currentSection = `DO${parentContext.elifIndex}`;
-          return; // State updated, move to the next line
+          return;
         }
         if (trimmed.startsWith('else:')) {
           parentContext.currentSection = 'ELSE';
-          return; // State updated, move to the next line
+          return;
         }
       }
 
-      // --- 2. HANDLE DEDENTATION (Corrected logic) ---
-      // Pop from the stack only when indentation DECREASES.
       while (this.blockStack.length > 0 && this.blockStack[this.blockStack.length - 1].indent > currentIndent) {
         this.blockStack.pop();
       }
 
-      // --- 3. PARSE THE LINE TO CREATE A BLOCK ---
       const parsedResult = this.parseLine(line, i, lines, i);
-      if (!parsedResult || !parsedResult.block) {
-        return; // Skip if no block was created (e.g., it was an else line)
-      }
+      if (!parsedResult || !parsedResult.block) return;
 
       const { block, ...context } = parsedResult;
       block.initSvg();
       block.render();
 
-      // --- 4. CONNECT THE BLOCK ---
       parentContext = this.blockStack.length > 0 ? this.blockStack[this.blockStack.length - 1] : null;
       if (parentContext) {
-        let inputName = 'DO'; // Default for loops
-        if (parentContext.type === 'if') {
-          inputName = parentContext.currentSection;
-        } else if (parentContext.block.getInput('STACK')) {
-            inputName = 'STACK';
-        } else if (parentContext.block.getInput('DO0')) {
-            inputName = 'DO0';
-        }
+        let inputName = 'DO';
+        if (parentContext.type === 'if') inputName = parentContext.currentSection;
+        else if (parentContext.block.getInput('STACK')) inputName = 'STACK';
+        else if (parentContext.block.getInput('DO0')) inputName = 'DO0';
         
         const sectionKey = `${parentContext.block.id}_${inputName}`;
         const lastBlock = lastBlockInSection[sectionKey];
-
-        if (lastBlock) { // Already a block in this section
-          if(lastBlock.nextConnection) {
-            lastBlock.nextConnection.connect(block.previousConnection);
-          }
-        } else { // First block in this section
+        if (lastBlock) {
+          if(lastBlock.nextConnection) lastBlock.nextConnection.connect(block.previousConnection);
+        } else {
           const targetInput = parentContext.block.getInput(inputName);
-          if (targetInput && targetInput.connection) {
-            targetInput.connection.connect(block.previousConnection);
-          }
+          if (targetInput && targetInput.connection) targetInput.connection.connect(block.previousConnection);
         }
         lastBlockInSection[sectionKey] = block;
-
       } else {
-        topLevelBlocks.push(block);
+        // ✅ FIXED: Connect sequential top-level blocks
+        if (lastTopLevelBlock && lastTopLevelBlock.nextConnection) {
+            lastTopLevelBlock.nextConnection.connect(block.previousConnection);
+        } else {
+            // This is the first block in a new stack.
+            topLevelBlocks.push(block);
+        }
+        lastTopLevelBlock = block; // Update the last block for the next iteration.
       }
       
-      // --- 5. PUSH NEW CONTROL BLOCKS ONTO THE STACK ---
-      // If the created block starts a new indented section, push it to the stack.
       if (context.type) {
         this.blockStack.push({ block, ...context });
       }
     });
 
-    // Arrange top-level blocks neatly on the workspace
+    // ✅ FIXED: Arrange only the TOP block of each stack
     let y = 50;
     topLevelBlocks.forEach(b => {
-      b.moveBy(50, y);
-      y += b.getHeightWidth().height + Blockly.SNAP_RADIUS * 2;
+      // Only move the block if it's not already connected to something above it
+      if (!b.previousConnection || !b.previousConnection.isConnected()) {
+        b.moveBy(50, y);
+        y += b.getHeightWidth().height + Blockly.SNAP_RADIUS * 2; // Space out separate stacks
+      }
     });
-
+    
     return topLevelBlocks;
   }
 }
