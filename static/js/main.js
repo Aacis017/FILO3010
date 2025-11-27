@@ -1,24 +1,234 @@
-///main.js
 // initialize Blockly workspace
-var workspace = Blockly.inject('blocklyDiv', {
-  toolbox: document.getElementById('toolbox'),
-  grid: {spacing: 20, length: 1, colour: '#ccc', snap: true},
-  zoom: {controls: true, wheel: true, startScale: 0.9},
- 
-});
+var workspace = null;
+var editor = null;
+var python = window.python; // Access global python object if needed
 
-// Initialize CodeMirror
-var editor = CodeMirror.fromTextArea(document.getElementById("codeEditor"), {
-    mode: "python",
-    theme: "darcula",
-    lineNumbers: true,
-    indentUnit: 4,
-    tabSize: 4,
-    autofocus: true
+// Override Python generator finish to remove variable initialization
+if (python && python.pythonGenerator) {
+  python.pythonGenerator.finish = function (code) {
+    const definitions = [];
+    for (const name in python.pythonGenerator.definitions_) {
+      const def = python.pythonGenerator.definitions_[name];
+      // Skip variable initializations like 'a = None'
+      if (def.match(/^[a-zA-Z_]\w*\s*=\s*None$/)) {
+        continue;
+      }
+      definitions.push(def);
+    }
+
+    // Clean up
+    delete python.pythonGenerator.definitions_;
+    delete python.pythonGenerator.functionNames_;
+    if (python.pythonGenerator.nameDB_) {
+      python.pythonGenerator.nameDB_.reset();
+    } else if (python.pythonGenerator.variableDB_) {
+      python.pythonGenerator.variableDB_.reset();
+    }
+
+    const defs = definitions.join('\n');
+    return defs ? defs + '\n\n' + code : code;
+  };
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  console.log("DOM fully loaded and parsed");
+
+  // Initialize Blockly
+  try {
+    console.log("Initializing Blockly...");
+    workspace = Blockly.inject('blocklyDiv', {
+      toolbox: document.getElementById('toolbox'),
+      grid: { spacing: 20, length: 1, colour: '#ccc', snap: true },
+      zoom: { controls: true, wheel: true, startScale: 0.9 },
+    });
+    console.log("Blockly initialized:", workspace);
+
+    // Explicitly register the VARIABLE category callback
+    workspace.registerToolboxCategoryCallback('VARIABLE', function (workspace) {
+      console.log("VARIABLE category clicked!");
+      var xml = Blockly.Variables.flyoutCategory(workspace);
+      console.log("Flyout XML:", xml);
+      return xml;
+    });
+
+    // Explicitly register the CREATE_VARIABLE button callback
+    workspace.registerButtonCallback('CREATE_VARIABLE', function (button) {
+      Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), null, 'item');
+    });
+
+  } catch (e) {
+    console.error("Blockly initialization error:", e);
+    alert("Blockly init error: " + e);
+  }
+
+  // Initialize CodeMirror
+  try {
+    console.log("Initializing CodeMirror...");
+    editor = CodeMirror.fromTextArea(document.getElementById("codeEditor"), {
+      mode: "python",
+      theme: "darcula",
+      lineNumbers: true,
+      indentUnit: 4,
+      tabSize: 4,
+      autofocus: true
+    });
+    console.log("CodeMirror initialized:", editor);
+  } catch (e) {
+    console.error("CodeMirror initialization error:", e);
+  }
+
+  // Initialize Parser
+  const parser = new PythonToBlocklyParser(workspace);
+
+  // ============================================
+  // EVENT LISTENERS
+  // ============================================
+
+  // Generate Code
+  document.getElementById('generateBtn').addEventListener('click', () => {
+    try {
+      const code = python.pythonGenerator.workspaceToCode(workspace);
+      editor.setValue(code);
+      logConsole('✨ Code generated from blocks', 'success');
+    } catch (e) {
+      logConsole(`❌ Generation error: ${e.message}`, 'error');
+    }
+  });
+
+  // Load Blocks
+  document.getElementById('loadBlocks').addEventListener('click', () => {
+    const code = editor.getValue();
+    try {
+      const blocks = parser.parse(code);
+      if (blocks) {
+        logConsole('🧩 Blocks loaded from code', 'success');
+      } else {
+        logConsole('⚠️ No blocks generated', 'warning');
+      }
+    } catch (e) {
+      console.error(e);
+      logConsole(`❌ Parse error: ${e.message}`, 'error');
+    }
+  });
+
+  // Center Workspace
+  document.getElementById('centerBtn').addEventListener('click', () => {
+    workspace.scrollCenter();
+    workspace.setScale(1);
+  });
+
+  // Start Button
+  document.getElementById("startBtn").addEventListener("click", () => {
+    const hasBlocks = workspace.getAllBlocks(false).length > 0;
+    const manualCode = editor.getValue().trim();
+
+    let programToSend = '';
+
+    if (hasBlocks) {
+      programToSend = python.pythonGenerator.workspaceToCode(workspace);
+      logConsole("🤖 Sending Blockly-generated program...", 'info');
+    } else if (manualCode) {
+      programToSend = manualCode;
+      logConsole("📝 Sending manually written code...", 'info');
+    } else {
+      alert("⚠️ Please create blocks or write code first!");
+      return;
+    }
+
+    updateStatus('executing', 'Executing...');
+
+    const serverUrl = window.location.hostname === 'localhost'
+      ? 'http://127.0.0.1:5000'
+      : `http://${window.location.hostname}:5000`;
+
+    fetch(`${serverUrl}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: programToSend })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          logConsole(`✅ ${data.message}`, 'success');
+          updateStatus('executing', 'Program Running');
+          checkProgramStatus();
+        } else {
+          logConsole(`❌ Error: ${data.message}`, 'error');
+          updateStatus('connected', 'Ready');
+        }
+      })
+      .catch(err => {
+        logConsole(`❌ Connection error: ${err.message}`, 'error');
+        updateStatus('disconnected', 'Connection Failed');
+      });
+  });
+
+  // Stop button
+  document.getElementById('stopBtn').addEventListener('click', () => {
+    const serverUrl = window.location.hostname === 'localhost'
+      ? 'http://127.0.0.1:5000'
+      : `http://${window.location.hostname}:5000`;
+
+    fetch(`${serverUrl}/stop_program`, { method: "POST" })
+      .then(res => res.json())
+      .then(data => {
+        logConsole('🛑 Program stopped', 'warning');
+        updateStatus('connected', 'Ready');
+      })
+      .catch(err => {
+        logConsole(`❌ Stop failed: ${err.message}`, 'error');
+      });
+  });
+
+  // Initial connection check
+  setTimeout(() => {
+    const serverUrl = window.location.hostname === 'localhost'
+      ? 'http://127.0.0.1:5000'
+      : `http://${window.location.hostname}:5000`;
+
+    fetch(`${serverUrl}/status`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.connection === 'connected') {
+          updateStatus('connected', 'Ready');
+          logConsole('✅ Connected to drone server', 'success');
+        }
+      })
+      .catch(() => {
+        updateStatus('disconnected', 'Server Offline');
+        logConsole('❌ Server not reachable', 'error');
+      });
+  }, 500);
+
+  // Auto-save workspace to localStorage every 30 seconds
+  setInterval(() => {
+    if (!workspace) return;
+    const xml = Blockly.Xml.workspaceToDom(workspace);
+    const xmlText = Blockly.Xml.domToText(xml);
+    try {
+      localStorage.setItem('blockly_workspace', xmlText);
+      logConsole('💾 Workspace auto-saved', 'info');
+    } catch (e) {
+      console.warn('Auto-save failed:', e);
+    }
+  }, 30000);
+
+  // Load workspace on startup
+  try {
+    const savedXml = localStorage.getItem('blockly_workspace');
+    if (savedXml) {
+      const xml = Blockly.utils.xml.textToDom(savedXml);
+      Blockly.Xml.domToWorkspace(xml, workspace);
+      logConsole('📂 Previous workspace loaded', 'info');
+    }
+  } catch (e) {
+    console.warn('Failed to load saved workspace:', e);
+  }
+
 });
 
 // ============================================
-// PYTHON TO BLOCKLY PARSER (FINAL CORRECTED VERSION)
+// PYTHON TO BLOCKLY PARSER
 // ============================================
 class PythonToBlocklyParser {
   constructor(workspace) {
@@ -36,7 +246,7 @@ class PythonToBlocklyParser {
   parseLine(line, lineNumber, lines, currentIndex) {
     const trimmed = line.trim();
     const indent = this.getIndent(line);
-    
+
     if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('import')) {
       return null;
     }
@@ -96,37 +306,101 @@ class PythonToBlocklyParser {
     else if (trimmed === 'filo.land()') block = this.workspace.newBlock('land');
     else if (trimmed === 'filo.stop()') block = this.workspace.newBlock('stop');
     else if (trimmed === 'filo.emergency()') block = this.workspace.newBlock('emergency');
-    else if (trimmed.match(/filo\.move_up\((\d+)\)/)) { block = this.workspace.newBlock('up'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
-    else if (trimmed.match(/filo\.move_down\((\d+)\)/)) { block = this.workspace.newBlock('down'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
-    else if (trimmed.match(/filo\.move_forward\((\d+)\)/)) { block = this.workspace.newBlock('forward'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
-    else if (trimmed.match(/filo\.move_back\((\d+)\)/)) { block = this.workspace.newBlock('back'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
-    else if (trimmed.match(/filo\.move_left\((\d+)\)/)) { block = this.workspace.newBlock('left'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
-    else if (trimmed.match(/filo\.move_right\((\d+)\)/)) { block = this.workspace.newBlock('right'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'DIST'); }
-    else if (trimmed.match(/filo\.rotate_clockwise\((\d+)\)/)) { block = this.workspace.newBlock('rotate_cw'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'ANGLE'); }
-    else if (trimmed.match(/filo\.rotate_counter_clockwise\((\d+)\)/)) { block = this.workspace.newBlock('rotate_ccw'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'ANGLE'); }
+    else if (trimmed.match(/filo\.move_up\((\d+)\)/)) { block = this.workspace.newBlock('up'); this.setNumberInput(block, 'DIST', trimmed.match(/\((.+)\)/)[1]); }
+    else if (trimmed.match(/filo\.move_down\((\d+)\)/)) { block = this.workspace.newBlock('down'); this.setNumberInput(block, 'DIST', trimmed.match(/\((.+)\)/)[1]); }
+    else if (trimmed.match(/filo\.move_forward\((\d+)\)/)) { block = this.workspace.newBlock('forward'); this.setNumberInput(block, 'DIST', trimmed.match(/\((.+)\)/)[1]); }
+    else if (trimmed.match(/filo\.move_back\((\d+)\)/)) { block = this.workspace.newBlock('back'); this.setNumberInput(block, 'DIST', trimmed.match(/\((.+)\)/)[1]); }
+    else if (trimmed.match(/filo\.move_left\((\d+)\)/)) { block = this.workspace.newBlock('left'); this.setNumberInput(block, 'DIST', trimmed.match(/\((.+)\)/)[1]); }
+    else if (trimmed.match(/filo\.move_right\((\d+)\)/)) { block = this.workspace.newBlock('right'); this.setNumberInput(block, 'DIST', trimmed.match(/\((.+)\)/)[1]); }
+    else if (trimmed.match(/filo\.rotate_clockwise\((\d+)\)/)) { block = this.workspace.newBlock('rotate_cw'); this.setNumberInput(block, 'ANGLE', trimmed.match(/\((.+)\)/)[1]); }
+    else if (trimmed.match(/filo\.rotate_counter_clockwise\((\d+)\)/)) { block = this.workspace.newBlock('rotate_ccw'); this.setNumberInput(block, 'ANGLE', trimmed.match(/\((.+)\)/)[1]); }
     else if (trimmed.match(/filo\.flip\(["']f["']\)/)) block = this.workspace.newBlock('flip_front');
     else if (trimmed.match(/filo\.flip\(["']b["']\)/)) block = this.workspace.newBlock('flip_back');
     else if (trimmed.match(/filo\.flip\(["']l["']\)/)) block = this.workspace.newBlock('flip_left');
     else if (trimmed.match(/filo\.flip\(["']r["']\)/)) block = this.workspace.newBlock('flip_right');
+
+    // Camera Commands
+    else if (trimmed === 'filo.take_picture()') block = this.workspace.newBlock('photo');
+    else if (trimmed === 'filo.start_recording()') block = this.workspace.newBlock('record_start');
+    else if (trimmed === 'filo.stop_recording()') block = this.workspace.newBlock('record_stop');
+
     else if (trimmed.startsWith('time.sleep(')) { const match = trimmed.match(/time\.sleep\((\d+(?:\.\d+)?)\)/); if (match) { block = this.workspace.newBlock('wait_seconds'); block.setFieldValue(match[1], 'SEC'); } }
     else if (trimmed.match(/filo\.set_speed\((\d+)\)/)) { block = this.workspace.newBlock('setspeed'); block.setFieldValue(trimmed.match(/\((\d+)\)/)[1], 'SPD'); }
-    else if (trimmed.match(/filo\.led_breathe\((.+)\)/)) { block = this.workspace.newBlock('led_breathe'); const a = trimmed.match(/\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/); block.setFieldValue(a[1], 'R'); block.setFieldValue(a[2], 'G'); block.setFieldValue(a[3], 'B'); block.setFieldValue(a[4], 'SP'); }
-    else if (trimmed.match(/filo\.led_flash\((.+)\)/)) { block = this.workspace.newBlock('led_flash'); const a = trimmed.match(/\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/); block.setFieldValue(a[1], 'R'); block.setFieldValue(a[2], 'G'); block.setFieldValue(a[3], 'B'); block.setFieldValue(a[4], 'SP'); }
-    else if (trimmed.match(/filo\.go\((.+)\)/)) { block = this.workspace.newBlock('go'); const a = trimmed.match(/\(([^,]+),([^,]+),([^,]+),([^)]+)\)/); if (a) { block.setFieldValue(a[1].trim(), 'X'); block.setFieldValue(a[2].trim(), 'Y'); block.setFieldValue(a[3].trim(), 'Z'); block.setFieldValue(a[4].trim(), 'SPD'); } }
-    else if (trimmed.match(/filo\.curve\((.+)\)/)) { block = this.workspace.newBlock('curve'); const a = trimmed.match(/\(([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^)]+)\)/); if (a) { block.setFieldValue(a[1].trim(), 'X1'); block.setFieldValue(a[2].trim(), 'Y1'); block.setFieldValue(a[3].trim(), 'Z1'); block.setFieldValue(a[4].trim(), 'X2'); block.setFieldValue(a[5].trim(), 'Y2'); block.setFieldValue(a[6].trim(), 'Z2'); block.setFieldValue(a[7].trim(), 'SPD'); } }
+    // LED Commands
+    else if (trimmed.match(/filo\.led_set_color\(["'](\w+)["']\)/)) {
+      block = this.workspace.newBlock('led_color');
+      const colorMatch = trimmed.match(/filo\.led_set_color\(["'](\w+)["']\)/);
+      if (colorMatch) block.setFieldValue(colorMatch[1], 'COLOR');
+    }
+    else if (trimmed.match(/filo\.led_set_rgb\((\d+),\s*(\d+),\s*(\d+)\)/)) {
+      block = this.workspace.newBlock('led_rgb');
+      const a = trimmed.match(/filo\.led_set_rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (a) { block.setFieldValue(a[1], 'R'); block.setFieldValue(a[2], 'G'); block.setFieldValue(a[3], 'B'); }
+    }
+    else if (trimmed.match(/filo\.led_breathe\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/)) {
+      block = this.workspace.newBlock('led_breathe');
+      const a = trimmed.match(/filo\.led_breathe\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/);
+      if (a) { block.setFieldValue(a[1], 'R'); block.setFieldValue(a[2], 'G'); block.setFieldValue(a[3], 'B'); block.setFieldValue(a[4], 'SP'); }
+    }
+    else if (trimmed.match(/filo\.led_flash\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/)) {
+      block = this.workspace.newBlock('led_flash');
+      const a = trimmed.match(/filo\.led_flash\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)/);
+      if (a) { block.setFieldValue(a[1], 'R'); block.setFieldValue(a[2], 'G'); block.setFieldValue(a[3], 'B'); block.setFieldValue(a[4], 'SP'); }
+    }
+
+    // Advanced movement
+    else if (trimmed.match(/filo\.go\((.+)\)/)) {
+      block = this.workspace.newBlock('go');
+      const a = trimmed.match(/filo\.go\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+      if (a) { block.setFieldValue(a[1].trim(), 'X'); block.setFieldValue(a[2].trim(), 'Y'); block.setFieldValue(a[3].trim(), 'Z'); block.setFieldValue(a[4].trim(), 'SPD'); }
+    }
+    else if (trimmed.match(/filo\.curve\((.+)\)/)) {
+      block = this.workspace.newBlock('curve');
+      const a = trimmed.match(/filo\.curve\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+      if (a) { block.setFieldValue(a[1].trim(), 'X1'); block.setFieldValue(a[2].trim(), 'Y1'); block.setFieldValue(a[3].trim(), 'Z1'); block.setFieldValue(a[4].trim(), 'X2'); block.setFieldValue(a[5].trim(), 'Y2'); block.setFieldValue(a[6].trim(), 'Z2'); block.setFieldValue(a[7].trim(), 'SPD'); }
+    }
     else if (trimmed.match(/print\(/)) { /* your print logic */ }
-    
+
+    // Variable Assignment
+    else if (trimmed.match(/^(\w+)\s*=\s*(.+)$/)) {
+      const match = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+      if (match) {
+        const varName = match[1];
+        const value = match[2];
+        // Ignore if it looks like a function call or keyword
+        if (!varName.includes('(') && !['if', 'elif', 'else', 'while', 'for'].includes(varName)) {
+          block = this.workspace.newBlock('variables_set');
+          block.setFieldValue(this.workspace.createVariable(varName).getId(), 'VAR');
+          this.setNumberInput(block, 'VALUE', value);
+        }
+      }
+    }
+
     if (!block) return null;
     return { block, ...context };
   }
 
+
   // Helper: Parse condition
   parseCondition(parentBlock, conditionStr, inputName = 'IF0') {
+    conditionStr = conditionStr.trim();
+
+    // Handle boolean literals (True/False)
+    if (conditionStr === 'True' || conditionStr === 'False') {
+      const boolBlock = this.workspace.newBlock('logic_boolean');
+      boolBlock.setFieldValue(conditionStr.toUpperCase(), 'BOOL');
+      boolBlock.initSvg(); boolBlock.render();
+      const input = parentBlock.getInput(inputName);
+      if (input && input.connection) input.connection.connect(boolBlock.outputConnection);
+      return;
+    }
+
+    // Handle comparison conditions
     const compMatch = conditionStr.match(/(.+?)\s*(==|!=|<|>|<=|>=)\s*(.+)/);
     if (compMatch) {
       const [, left, op, right] = compMatch;
       const compareBlock = this.workspace.newBlock('logic_compare');
-      const opMap = {'==': 'EQ', '!=': 'NEQ', '<': 'LT', '>': 'GT', '<=': 'LTE', '>=': 'GTE'};
+      const opMap = { '==': 'EQ', '!=': 'NEQ', '<': 'LT', '>': 'GT', '<=': 'LTE', '>=': 'GTE' };
       compareBlock.setFieldValue(opMap[op] || 'EQ', 'OP');
       this.setCompareInput(compareBlock, 'A', left.trim());
       this.setCompareInput(compareBlock, 'B', right.trim());
@@ -136,27 +410,50 @@ class PythonToBlocklyParser {
     }
   }
 
-  // Helper: Set number input
+  // Helper: Set number input or variable getter or sensor
   setNumberInput(block, inputName, value) {
     const input = block.getInput(inputName);
     if (!input || !input.connection) return;
-    const numBlock = this.workspace.newBlock('math_number');
-    numBlock.setFieldValue(value, 'NUM');
-    numBlock.initSvg(); numBlock.render();
-    input.connection.connect(numBlock.outputConnection);
+
+    value = value.trim();
+    if (!isNaN(value)) {
+      const numBlock = this.workspace.newBlock('math_number');
+      numBlock.setFieldValue(value, 'NUM');
+      numBlock.initSvg(); numBlock.render();
+      input.connection.connect(numBlock.outputConnection);
+    } else if (value === 'None') {
+      const nullBlock = this.workspace.newBlock('logic_null');
+      nullBlock.initSvg(); nullBlock.render();
+      input.connection.connect(nullBlock.outputConnection);
+    } else if (value === 'True' || value === 'False') {
+      const boolBlock = this.workspace.newBlock('logic_boolean');
+      boolBlock.setFieldValue(value.toUpperCase(), 'BOOL');
+      boolBlock.initSvg(); boolBlock.render();
+      input.connection.connect(boolBlock.outputConnection);
+    } else if (value === 'filo.get_battery()') {
+      const sensorBlock = this.workspace.newBlock('battery_level');
+      sensorBlock.initSvg(); sensorBlock.render();
+      input.connection.connect(sensorBlock.outputConnection);
+    } else if (value === 'filo.get_wifi()') {
+      const sensorBlock = this.workspace.newBlock('wifi_signal');
+      sensorBlock.initSvg(); sensorBlock.render();
+      input.connection.connect(sensorBlock.outputConnection);
+    } else if (value === 'filo.get_height()') {
+      const sensorBlock = this.workspace.newBlock('altitude');
+      sensorBlock.initSvg(); sensorBlock.render();
+      input.connection.connect(sensorBlock.outputConnection);
+    } else {
+      // Assume it's a variable
+      const varBlock = this.workspace.newBlock('variables_get');
+      varBlock.setFieldValue(this.workspace.createVariable(value).getId(), 'VAR');
+      varBlock.initSvg(); varBlock.render();
+      input.connection.connect(varBlock.outputConnection);
+    }
   }
 
   // Helper: Set compare input
   setCompareInput(block, inputName, value) {
-    const input = block.getInput(inputName);
-    if (!input || !input.connection) return;
-    if (!isNaN(value)) {
-      this.setNumberInput(block, inputName, value);
-    } else if (value.includes('filo.get_battery()')) {
-      const sensorBlock = this.workspace.newBlock('battery_level');
-      sensorBlock.initSvg(); sensorBlock.render();
-      input.connection.connect(sensorBlock.outputConnection);
-    }
+    this.setNumberInput(block, inputName, value);
   }
 
   // Main parse function
@@ -165,8 +462,8 @@ class PythonToBlocklyParser {
     this.blockStack = [];
     const lines = code.split('\n');
     let topLevelBlocks = [];
-    let lastBlockInSection = {}; 
-    let lastTopLevelBlock = null; // ✅ ADDED: Tracker for the last top-level block
+    let lastBlockInSection = {};
+    let lastTopLevelBlock = null;
 
     lines.forEach((line, i) => {
       const trimmed = line.trim();
@@ -189,7 +486,7 @@ class PythonToBlocklyParser {
         }
       }
 
-      while (this.blockStack.length > 0 && this.blockStack[this.blockStack.length - 1].indent > currentIndent) {
+      while (this.blockStack.length > 0 && this.blockStack[this.blockStack.length - 1].indent >= currentIndent) {
         this.blockStack.pop();
       }
 
@@ -206,33 +503,33 @@ class PythonToBlocklyParser {
         if (parentContext.type === 'if') inputName = parentContext.currentSection;
         else if (parentContext.block.getInput('STACK')) inputName = 'STACK';
         else if (parentContext.block.getInput('DO0')) inputName = 'DO0';
-        
+
         const sectionKey = `${parentContext.block.id}_${inputName}`;
         const lastBlock = lastBlockInSection[sectionKey];
         if (lastBlock) {
-          if(lastBlock.nextConnection) lastBlock.nextConnection.connect(block.previousConnection);
+          if (lastBlock.nextConnection) lastBlock.nextConnection.connect(block.previousConnection);
         } else {
           const targetInput = parentContext.block.getInput(inputName);
           if (targetInput && targetInput.connection) targetInput.connection.connect(block.previousConnection);
         }
         lastBlockInSection[sectionKey] = block;
       } else {
-        // ✅ FIXED: Connect sequential top-level blocks
+        // Connect sequential top-level blocks
         if (lastTopLevelBlock && lastTopLevelBlock.nextConnection) {
-            lastTopLevelBlock.nextConnection.connect(block.previousConnection);
+          lastTopLevelBlock.nextConnection.connect(block.previousConnection);
         } else {
-            // This is the first block in a new stack.
-            topLevelBlocks.push(block);
+          // This is the first block in a new stack.
+          topLevelBlocks.push(block);
         }
         lastTopLevelBlock = block; // Update the last block for the next iteration.
       }
-      
+
       if (context.type) {
         this.blockStack.push({ block, ...context });
       }
     });
 
-    // ✅ FIXED: Arrange only the TOP block of each stack
+    // Arrange only the TOP block of each stack
     let y = 50;
     topLevelBlocks.forEach(b => {
       // Only move the block if it's not already connected to something above it
@@ -241,55 +538,10 @@ class PythonToBlocklyParser {
         y += b.getHeightWidth().height + Blockly.SNAP_RADIUS * 2; // Space out separate stacks
       }
     });
-    
+
     return topLevelBlocks;
   }
 }
-// ============================================
-// UI EVENT HANDLERS
-// ============================================
-
-// Generate Python code from Blockly blocks
-document.getElementById('generateBtn').addEventListener('click', function() {
-  try {
-    const code = python.pythonGenerator.workspaceToCode(workspace);
-    editor.setValue(code);
-    logConsole("✅ Python code generated successfully", 'success');
-  } catch (error) {
-    logConsole(`❌ Generation error: ${error.message}`, 'error');
-  }
-});
-
-// Load blocks from Python code
-document.getElementById('loadBlocks').addEventListener('click', function() {
-  const code = editor.getValue().trim();
-  
-  if (!code) {
-    alert("⚠️ No code to load!");
-    return;
-  }
-  
-  try {
-    const parser = new PythonToBlocklyParser(workspace);
-    const blocks = parser.parse(code);
-    
-    if (blocks.length > 0) {
-      logConsole(`✅ Loaded ${blocks.length} blocks from Python code`, 'success');
-      workspace.scrollCenter();
-    } else {
-      logConsole("⚠️ No valid blocks found in code", 'warning');
-    }
-  } catch (error) {
-    console.error("Parse error:", error);
-    logConsole(`❌ Parse error: ${error.message}`, 'error');
-    alert(`Failed to parse code:\n${error.message}`);
-  }
-});
-
-// Center workspace
-document.getElementById("centerBtn").addEventListener("click", () => {
-  workspace.scrollCenter();
-});
 
 // ============================================
 // CONSOLE & STATUS HELPERS
@@ -312,10 +564,10 @@ function updateStatus(status, text) {
   const indicator = document.querySelector('.status-indicator');
   const statusText = document.getElementById('statusText');
   const stopBtn = document.getElementById('stopBtn');
-  
+
   indicator.className = 'status-indicator status-' + status;
   statusText.textContent = text;
-  
+
   if (status === 'executing') {
     stopBtn.classList.remove('hidden');
   } else {
@@ -323,78 +575,11 @@ function updateStatus(status, text) {
   }
 }
 
-// ============================================
-// PROGRAM EXECUTION
-// ============================================
-
-document.getElementById("startBtn").addEventListener("click", () => {
-    const hasBlocks = workspace.getAllBlocks(false).length > 0;
-    const manualCode = editor.getValue().trim();
-    
-    let programToSend = '';
-    
-    if (hasBlocks) {
-      programToSend = python.pythonGenerator.workspaceToCode(workspace);
-      logConsole("🤖 Sending Blockly-generated program...", 'info');
-    } else if (manualCode) {
-      programToSend = manualCode;
-      logConsole("📝 Sending manually written code...", 'info');
-    } else {
-      alert("⚠️ Please create blocks or write code first!");
-      return;
-    }
-    
-    updateStatus('executing', 'Executing...');
-    
-    const serverUrl = window.location.hostname === 'localhost' 
-      ? 'http://127.0.0.1:5000' 
-      : `http://${window.location.hostname}:5000`;
-    
-    fetch(`${serverUrl}/run`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: programToSend })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === 'success') {
-        logConsole(`✅ ${data.message}`, 'success');
-        updateStatus('executing', 'Program Running');
-        checkProgramStatus();
-      } else {
-        logConsole(`❌ Error: ${data.message}`, 'error');
-        updateStatus('connected', 'Ready');
-      }
-    })
-    .catch(err => {
-      logConsole(`❌ Connection error: ${err.message}`, 'error');
-      updateStatus('disconnected', 'Connection Failed');
-    });
-});
-
-// Stop button
-document.getElementById('stopBtn').addEventListener('click', () => {
-  const serverUrl = window.location.hostname === 'localhost' 
-    ? 'http://127.0.0.1:5000' 
-    : `http://${window.location.hostname}:5000`;
-  
-  fetch(`${serverUrl}/stop_program`, { method: "POST" })
-  .then(res => res.json())
-  .then(data => {
-    logConsole('🛑 Program stopped', 'warning');
-    updateStatus('connected', 'Ready');
-  })
-  .catch(err => {
-    logConsole(`❌ Stop failed: ${err.message}`, 'error');
-  });
-});
-
-// Check program status
 function checkProgramStatus() {
-  const serverUrl = window.location.hostname === 'localhost' 
-    ? 'http://127.0.0.1:5000' 
+  const serverUrl = window.location.hostname === 'localhost'
+    ? 'http://127.0.0.1:5000'
     : `http://${window.location.hostname}:5000`;
-  
+
   const interval = setInterval(() => {
     fetch(`${serverUrl}/status`)
       .then(res => res.json())
@@ -411,49 +596,3 @@ function checkProgramStatus() {
       });
   }, 1000);
 }
-
-// Initial connection check
-setTimeout(() => {
-  const serverUrl = window.location.hostname === 'localhost' 
-    ? 'http://127.0.0.1:5000' 
-    : `http://${window.location.hostname}:5000`;
-  
-  fetch(`${serverUrl}/status`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.connection === 'connected') {
-        updateStatus('connected', 'Ready');
-        logConsole('✅ Connected to drone server', 'success');
-      }
-    })
-    .catch(() => {
-      updateStatus('disconnected', 'Server Offline');
-      logConsole('❌ Server not reachable', 'error');
-    });
-}, 500);
-
-// Auto-save workspace to localStorage every 30 seconds
-setInterval(() => {
-  const xml = Blockly.Xml.workspaceToDom(workspace);
-  const xmlText = Blockly.Xml.domToText(xml);
-  try {
-    localStorage.setItem('blockly_workspace', xmlText);
-    logConsole('💾 Workspace auto-saved', 'info');
-  } catch (e) {
-    console.warn('Auto-save failed:', e);
-  }
-}, 30000);
-
-// Load workspace on startup
-window.addEventListener('load', () => {
-  try {
-    const savedXml = localStorage.getItem('blockly_workspace');
-    if (savedXml) {
-      const xml = Blockly.utils.xml.textToDom(savedXml);
-      Blockly.Xml.domToWorkspace(xml, workspace);
-      logConsole('📂 Previous workspace loaded', 'info');
-    }
-  } catch (e) {
-    console.warn('Failed to load saved workspace:', e);
-  }
-});

@@ -1,18 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Robotix Japan Education</title>
-  <script src="/static/js/taliwind.js"></script>
-  <script src="/static/js/blockly.min.js"></script>
-  <!-- <script src="/static/js/blocks_compressed.js"></script> -->
-  <script src="/static/js/python_compressed.js"></script>
-  <!-- <script src="https://unpkg.com/blockly/msg/js/en.js"></script> -->
-  <!-- <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet"> -->
-  <link rel="stylesheet" href="/static/css/codemirror.min.css" />
-  <script src="/static/js/codemirror.min.js"></script>
-  <script src="/static/js/python.min.js"></script>
-  <style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robotix Japan - Filo Drone</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/css/codemirror.min.css">
+    <style>
+    /* Custom Status Indicators */
     .status-indicator {
       width: 12px;
       height: 12px;
@@ -27,13 +23,13 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
-  </style>
+    </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col">
   
   <!-- Top bar -->
   <header class="flex items-center justify-between bg-white shadow px-6 py-4">
-    <h1 class="text-xl font-bold">🤖 Robotix Japan - Blockly Programming</h1>
+    <h1 class="text-xl font-bold">Robotix Japan</h1>
     <a href="/filo" class="text-lg font-bold text-blue-500 hover:underline">📱 Manual Control</a>
 
     <div class="flex items-center space-x-4">
@@ -117,10 +113,17 @@
       <block type="led_breathe"></block>
       <block type="led_flash"></block>
     </category>
+
+    <!-- CAMERA -->
+    <category name="Camera" colour="#9C27B0">
+      <block type="photo"></block>
+      <block type="record_start"></block>
+      <block type="record_stop"></block>
+    </category>
   
     <!-- OPERATOR -->
     <category name="Logic" colour="%{BKY_LOGIC_HUE}">
-      <block type="controls_if"></block>
+      <!-- <block type="controls_if"></block> -->
       <block type="logic_compare"></block>
       <block type="logic_operation"></block>
       <block type="logic_negate"></block>
@@ -163,8 +166,18 @@
     </category>
   </xml>
 
-  <script src="/static/js/blockwitharray.js"></script>  
-  <script src="/static/js/generatorspy.js"></script>
+  <!-- SCRIPTS -->
+  <!-- CodeMirror -->
+  <script src="/static/js/codemirror.min.js"></script>
+  <script src="/static/js/python.min.js"></script>
+
+  <!-- Blockly -->
+  <script src="/static/js/blockly.min.js"></script>
+  <script src="/static/js/msg/en.js"></script>
+  <script src="/static/js/blocks_compressed.js"></script>
+  <script src="/static/js/python_compressed.js"></script>
+
+  <!-- Main Application Logic -->
   <script src="/static/js/main.js"></script>
 
 </body>
