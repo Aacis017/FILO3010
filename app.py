@@ -11,14 +11,14 @@ autonomous_mode = False  # Flag for autonomous flight
 # -------------------------
 try:
     if os.name == "nt":
-        arduino = serial.Serial("COM10", 250000, timeout=1)
+        arduino = serial.Serial("COM4", 250000, timeout=1)
     else:
         arduino = serial.Serial("/dev/serial0", 250000, timeout=1)
     time.sleep(2)
     arduino.reset_input_buffer()
-    print("✅ Arduino connected")
+    print("[OK] Arduino connected")
 except Exception as e:
-    print("❌ Arduino connection failed:", e)
+    print("[ERROR] Arduino connection failed:", e)
     arduino = None
 
 # -------------------------
@@ -41,18 +41,18 @@ try:
         picam2.start()
         time.sleep(2)
         use_picamera2 = True
-        print("📷 Using PiCamera2")
+        print("[CAM] Using PiCamera2")
 except Exception as e:
-    print("⚠️ PiCamera2 not available:", e)
+    print("[WARN] PiCamera2 not available:", e)
     use_picamera2 = False
 
 if not use_picamera2:
     try:
         import cv2
         camera = cv2.VideoCapture(0)
-        print("💻 Using OpenCV webcam")
+        print("[CAM] Using OpenCV webcam")
     except Exception as e:
-        print("❌ OpenCV camera error:", e)
+        print("[ERROR] OpenCV camera error:", e)
         camera = None
 
 # -------------------------
@@ -203,10 +203,10 @@ class DroneCommandExecutor:
         
         for i, cmd in enumerate(commands):
             if not self.running:
-                print("❌ Command execution stopped")
+                print("[X] Command execution stopped")
                 break
             
-            print(f"📡 Executing command {i+1}/{len(commands)}: {cmd['type']}")
+            print(f"[CMD] Executing command {i+1}/{len(commands)}: {cmd['type']}")
             
             if cmd['type'] == 'takeoff':
                 # Arm motors first
@@ -262,11 +262,11 @@ class DroneCommandExecutor:
             
             elif cmd['type'] == 'led':
                 # LED commands would go here
-                print(f"💡 LED: {cmd['command']}")
+                print(f"[LED] LED: {cmd['command']}")
                 time.sleep(cmd['delay'])
         
         self.running = False
-        print("✅ Command sequence completed")
+        print("[OK] Command sequence completed")
 
 executor = DroneCommandExecutor(arduino) if arduino else None
 
@@ -294,7 +294,7 @@ def run_program():
             }), 400
         
         print("\n" + "="*50)
-        print("🤖 AUTONOMOUS FLIGHT PROGRAM RECEIVED")
+        print("[AUTO] AUTONOMOUS FLIGHT PROGRAM RECEIVED")
         print("="*50)
         print(python_code)
         print("="*50 + "\n")
@@ -308,7 +308,7 @@ def run_program():
                 "message": "No valid commands found in program"
             }), 400
         
-        print(f"📋 Parsed {len(commands)} commands")
+        print(f"[INFO] Parsed {len(commands)} commands")
         
         # Execute in background thread
         autonomous_mode = True
@@ -326,7 +326,7 @@ def run_program():
         })
         
     except Exception as e:
-        print(f"❌ Error executing program: {e}")
+        print(f"[ERROR] Error executing program: {e}")
         return jsonify({
             "status": "error",
             "message": str(e)
@@ -460,7 +460,7 @@ def arm():
                         "status": "error",
                         "message": "❌ Pre-arm checks FAILED!"
                     }), 400
-            time.sleep(0.05)
+            time.sleep(0.5)
         
         return jsonify({
             "status": "error",
@@ -550,33 +550,33 @@ def read_from_arduino():
                                 telemetry["armed"] = parts[7].strip() == "1"
                                 telemetry["connection"] = "connected"
                         except (ValueError, IndexError) as e:
-                            print(f"⚠️ Telemetry parse error: {e}")
+                            print(f"[WARN] Telemetry parse error: {e}")
                             
                     elif line.startswith("ACK,"):
                         telemetry["connection"] = "connected"
                     
                     elif "Motors ARMED" in line:
-                        print(f"✅ {line}")
+                        print(f"[OK] {line}")
                         with arm_response_lock:
                             arm_response = "success"
                     
                     elif "Pre-arm checks FAILED" in line or ("❌" in line and "arm" in line.lower()):
-                        print(f"❌ {line}")
+                        print(f"[ERROR] {line}")
                         with arm_response_lock:
                             arm_response = "failed"
                     
                     elif line.startswith("🚨") or line.startswith("EMERGENCY"):
-                        print(f"⚠️ {line}")
+                        print(f"[WARN] {line}")
                         armed = False
                         autonomous_mode = False
                         telemetry["armed"] = False
                     
                     else:
                         if len(line) > 0 and not line.startswith('\x00'):
-                            print(f"📡 {line}")
+                            print(f"[DATA] {line}")
                         
         except Exception as e:
-            print(f"⚠️ Serial read error: {e}")
+            print(f"[WARN] Serial read error: {e}")
             telemetry["connection"] = "error"
             buffer = ""
             time.sleep(1)
@@ -605,12 +605,12 @@ watchdog_thread.start()
 # -------------------------
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("🚁 DRONE CONTROL SERVER")
+    print("DRONE CONTROL SERVER")
     print("="*50)
-    print("📱 Manual Control: http://<ip>:5000/filo")
-    print("🤖 Blockly Programming: http://<ip>:5000")
-    print("🔒 Safety features enabled")
-    print("⚠️  ALWAYS test in safe environment!")
+    print("Manual Control: http://<ip>:5000/filo")
+    print("Blockly Programming: http://<ip>:5000")
+    print("Safety features enabled")
+    print("ALWAYS test in safe environment!")
     print("="*50 + "\n")
     
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
