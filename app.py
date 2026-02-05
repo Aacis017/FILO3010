@@ -403,7 +403,10 @@ def joystick():
         roll = joystick_state["roll"] * 45
         pitch = joystick_state["pitch"] * 45
         yaw = joystick_state["yaw"] * 45
-        throttle_input = -joystick_state["throttle"]
+        # Map joystick throttle (-1.0 to +1.0) to PWM (1000 to 2000)
+        # When joystick released: throttle = -1.0 → PWM = 1000 (minimum)
+        # When joystick pushed up: throttle = +1.0 → PWM = 2000 (maximum)
+        throttle_input = joystick_state["throttle"]
         throttle = 1000 + ((throttle_input + 1) * 500)
 
         if arduino:
